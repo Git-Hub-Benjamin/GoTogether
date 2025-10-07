@@ -1,0 +1,101 @@
+[
+  {
+    "name": "Rend Lake College",
+    "state": "Illinois",
+    "lat": 38.13148101100006,
+    "lng": -88.91828310799997,
+    "population": 2101,
+    "domains": [
+      "rlc.edu"
+    ],
+    "colors": [
+      "#040404",
+      "#B70D24"
+    ]
+  },
+  {
+    "name": "Waubonsee Community College",
+    "state": "Illinois",
+    "lat": 41.798044,
+    "lng": -88.458796,
+    "population": 8569,
+    "domains": [
+      "waubonsee.edu"
+    ],
+    "colors": [
+      "#888888",
+      "#BBBBBB"
+    ]
+  },
+  {
+    "name": "Western Technical College",
+    "state": "Texas",
+    "lat": 31.877798854000048,
+    "lng": -106.42589093599997,
+    "population": 653,
+    "domains": [
+      "westerntc.edu"
+    ],
+    "colors": [
+      "#FFFFFF",
+      "#003399"
+    ]
+  },
+  {
+    "name": "Buena Vista University",
+    "state": "Iowa",
+    "lat": 42.64225417700004,
+    "lng": -95.20851103899997,
+    "population": 2355,
+    "domains": [
+      "bvu.edu"
+    ],
+    "colors": [
+      "#FFFFFF",
+      "#0779BF"
+    ]
+  },
+  {
+    "name": "Academy Of Art University",
+    "state": "California",
+    "lat": 37.78774752900006,
+    "lng": -122.40068563799997,
+    "population": 10505,
+    "domains": [
+      "academyart.edu",
+      "art.edu"
+    ],
+    "colors": [
+      "#003388",
+      "#FFFFFF"
+    ]
+  },
+  {
+    "name": "Michigan State University",
+    "state": "Michigan",
+    "lat": 42.72476,
+    "lng": -84.473639,
+    "population": 62325,
+    "domains": [
+      "msu.edu"
+    ],
+    "colors": [
+      "#FFFFFF",
+      "#BBBBBB"
+    ]
+  },
+  {
+    "name": "King's College",
+    "state": "Pennsylvania",
+    "lat": 41.24888894500003,
+    "lng": -75.87803192899997,
+    "population": 2912,
+    "domains": [
+      "kings.edu"
+    ],
+    "colors": [
+      "#783CE2",
+      "#FFFFFF"
+    ]
+  }
+]
