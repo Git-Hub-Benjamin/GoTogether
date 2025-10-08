@@ -1,25 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 
-interface User {
-  email: string;
-  school: string;
-  colors?: string[]; 
-}
+const AuthContext = createContext(undefined);
 
-interface AuthContextType {
-  user: User | null;
-  token: string | null;
-  login: (token: string, user: User) => void;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
 
   useEffect(() => {
     const storedToken = localStorage.getItem("token");
@@ -30,7 +15,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
-  const login = (newToken: string, newUser: User) => {
+  const login = (newToken, newUser) => {
     setToken(newToken);
     setUser(newUser);
     localStorage.setItem("token", newToken);

@@ -1,10 +1,9 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import authRouter from "./routes/auth";
-import ridesRouter from "./routes/rides";
-import schoolsRouter from "./routes/schools";
-import nearbyRouter from "./routes/nearby"
+import authRouter from "./routes/auth.js";
+import ridesRouter from "./routes/rides.js";
+import schoolsRouter from "./routes/schools.js";
 
 dotenv.config();
 
@@ -20,7 +19,6 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/rides", ridesRouter);
 app.use("/api/schools", schoolsRouter);
-app.use("/api/nearby", nearbyRouter);
 
 const PORT = process.env.PORT || 5000;
 

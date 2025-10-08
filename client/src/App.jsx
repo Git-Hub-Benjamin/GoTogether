@@ -1,7 +1,7 @@
 import React from "react";
-import { AuthProvider, useAuth } from "./context/AuthContext.tsx";
-import LoginPage from "./pages/LoginPage.tsx";
-import DashboardPage from "./pages/DashboardPage.tsx";
+import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
+import LoginPage from "./pages/LoginPage.jsx";
+import DashboardPage from "./pages/DashboardPage.jsx";
 
 function AppContent() {
   const { user } = useAuth();

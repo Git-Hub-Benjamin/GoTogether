@@ -1,17 +1,14 @@
 import nodemailer from "nodemailer";
 
 const transporter = nodemailer.createTransport({
-  service: "gmail", // you can use another service or SMTP config
+  service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
 });
 
-export async function sendVerificationEmail(
-  to: string,
-  code: string
-): Promise<void> {
+export async function sendVerificationEmail(to, code) {
   const mailOptions = {
     from: `"AggieRides" <${process.env.EMAIL_USER}>`,
     to,

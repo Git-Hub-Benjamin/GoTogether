@@ -1,21 +1,17 @@
 import React, { useState } from "react";
 import { TextField, Button, Box, Typography, IconButton } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import SchoolSelect, { University } from "./SchoolSelect.tsx";
-import { useAuth } from "../context/AuthContext.tsx";
+import SchoolSelect from "./SchoolSelect.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const API_URL = "http://localhost:5000/api/auth";
 
-interface LoginFormProps {
-  disabled?: boolean;
-}
-
-const LoginForm: React.FC<LoginFormProps> = ({ disabled = false }) => {
+const LoginForm = ({ disabled = false }) => {
   const { login } = useAuth();
 
-  const [stage, setStage] = useState<"email" | "code">("email");
+  const [stage, setStage] = useState("email");
   const [selectedState, setSelectedState] = useState("");
-  const [selectedSchool, setSelectedSchool] = useState<University | null>(null);
+  const [selectedSchool, setSelectedSchool] = useState(null);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -24,12 +20,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ disabled = false }) => {
   const handleEmailSubmit = async () => {
     if (!selectedSchool || !selectedState) {
       setError("Please select your state and university first.");
-      return;
-    }
-
-    const domain = selectedSchool.domain;
-    if (!email.endsWith(domain)) {
-      setError(`Please use your valid @${domain} email address.`);
       return;
     }
 
@@ -43,7 +33,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ disabled = false }) => {
         body: JSON.stringify({
           email,
           school: selectedSchool.name,
-          domain,
           state: selectedState,
         }),
       });
@@ -51,10 +40,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ disabled = false }) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
 
-      // ✅ Dynamically reflect backend message
       setStatus(data.message);
       setStage("code");
-    } catch (err: any) {
+    } catch (err) {
       setError(err.message);
       setStatus("");
     }
@@ -74,7 +62,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ disabled = false }) => {
       if (!res.ok) throw new Error(data.message);
 
       login(data.token, data.user);
-    } catch (err: any) {
+    } catch (err) {
       setError(err.message);
       setStatus("");
     }
@@ -82,7 +70,6 @@ const LoginForm: React.FC<LoginFormProps> = ({ disabled = false }) => {
 
   return (
     <Box>
-      {/* ──────────────── EMAIL STAGE ──────────────── */}
       {stage === "email" && (
         <>
           <SchoolSelect
@@ -125,10 +112,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ disabled = false }) => {
         </>
       )}
 
-      {/* ──────────────── CODE STAGE ──────────────── */}
       {stage === "code" && (
         <>
-          {/* Back Arrow */}
           <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
             <IconButton
               onClick={() => {
@@ -163,7 +148,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ disabled = false }) => {
           </Button>
 
           {status && (
-            <Typography align="center" sx={{ mt: 2, color: "text.secondary" }}>
+            <Typography
+              align="center"
+              sx={{ mt: 2, color: "text.secondary" }}
+            >
               {status}
             </Typography>
           )}

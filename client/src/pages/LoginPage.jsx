@@ -1,16 +1,11 @@
 import React, { useEffect, useState } from "react";
-import {
-  Container,
-  Typography,
-  Box,
-  CircularProgress,
-} from "@mui/material";
-import LoginForm from "../components/LoginForm.tsx";
+import { Container, Typography, Box, CircularProgress } from "@mui/material";
+import LoginForm from "../components/LoginForm.jsx";
 
 const SERVER_URL = "http://localhost:5000/";
 
-const LoginPage: React.FC = () => {
-  const [serverOnline, setServerOnline] = useState<boolean | null>(null);
+const LoginPage = () => {
+  const [serverOnline, setServerOnline] = useState(null);
 
   const checkServerStatus = async () => {
     try {
@@ -22,10 +17,9 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  // Ping server every 10 seconds
   useEffect(() => {
     checkServerStatus();
-    const interval = setInterval(checkServerStatus, 10_000);
+    const interval = setInterval(checkServerStatus, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -39,13 +33,11 @@ const LoginPage: React.FC = () => {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-
-        // ✅ Subtle modern gradient — soft neutral tones
         background: `linear-gradient(-45deg,
-          #b4b6b8ff,
-          #c9c7c7ff,
-          #c1c0c0ff,
-          #f5f5f5
+          #223732ff,
+          #27443fff,
+          #27403C,
+          #30514bff
         )`,
         backgroundSize: "400% 600%",
         animation: "gradientDrift 60s ease-in-out infinite",
@@ -79,7 +71,6 @@ const LoginPage: React.FC = () => {
             transition: "background 0.4s ease",
           }}
         >
-          {/* ---------- HEADER + STATUS INDICATOR ---------- */}
           <Box
             sx={{
               display: "flex",
@@ -122,7 +113,6 @@ const LoginPage: React.FC = () => {
             )}
           </Box>
 
-          {/* ---------- SERVER STATUS TEXT ---------- */}
           {serverOnline === false && (
             <Typography
               variant="body2"
@@ -130,11 +120,10 @@ const LoginPage: React.FC = () => {
               color="error"
               sx={{ mb: 2 }}
             >
-              ⚠️ Server is offline — please try again later
+              ⚠️ Server is offline — please try again later
             </Typography>
           )}
 
-          {/* ---------- LOGIN FORM ---------- */}
           <LoginForm disabled={!serverOnline} />
         </Box>
       </Container>
