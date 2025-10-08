@@ -1,0 +1,50 @@
+[
+  {
+    "university": "Utah State University",
+    "colors": {
+      "bg_primary": "#0F2439",
+      "bg_secondary": "#288DC2",
+      "accent_primary": "#1E3A8A",
+      "accent_secondary": "#2563EB",
+      "button_primary_bg": "#1E293B",
+      "button_primary_text": "#ffffff",
+      "button_primary_hover": "#0F172A",
+      "button_secondary_border": "#CBD5E1",
+      "button_secondary_text": "#475569",
+      "button_secondary_hover_bg": "#F1F5F9",
+      "card_bg": "#FFFFFF",
+      "card_shadow": "rgba(0,0,0,0.08)",
+      "text_primary": "#0F172A",
+      "text_secondary": "#475569",
+      "header_bg_blur": "rgba(255,255,255,0.08)",
+      "header_text": "#FFFFFF",
+      "header_button_bg": "rgba(255,255,255,0.1)",
+      "header_button_hover_bg": "rgba(255,255,255,0.2)",
+      "footer_text": "rgba(255,255,255,0.6)"
+    }
+  },
+  {
+    "university": "University Of Utah",
+    "colors": {
+      "bg_primary": "#7C0A02",
+      "bg_secondary": "#A63232",
+      "accent_primary": "#BE3144",
+      "accent_secondary": "#E85C4A",
+      "button_primary_bg": "#A63232",
+      "button_primary_text": "#FFFFFF",
+      "button_primary_hover": "#7C0A02",
+      "button_secondary_border": "#E5E7EB",
+      "button_secondary_text": "#6B7280",
+      "button_secondary_hover_bg": "#F9FAFB",
+      "card_bg": "#FFFFFF",
+      "card_shadow": "rgba(0,0,0,0.08)",
+      "text_primary": "#000000",
+      "text_secondary": "#000000",
+      "header_bg_blur": "rgba(255,255,255,0.08)",
+      "header_text": "#FFFFFF",
+      "header_button_bg": "rgba(255,255,255,0.1)",
+      "header_button_hover_bg": "rgba(255,255,255,0.2)",
+      "footer_text": "rgba(255,255,255,0.6)"
+    }
+  }
+]

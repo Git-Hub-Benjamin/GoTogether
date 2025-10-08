@@ -1,92 +1,156 @@
 import React from "react";
-import { Box, Button, Typography } from "@mui/material";
+import { Box, Button, Typography, Divider } from "@mui/material";
+import { useAuth } from "../../context/AuthContext.jsx";
+import universityColors from "../../assets/university_colors.json";
 
 const RideCard = ({ ride, userEmail, joinRide, leaveRide, index = 0 }) => {
+  const { user } = useAuth();
+  const schoolName = user?.school || "";
+
+  // Pull color theme from the university JSON
+  const colors =
+    universityColors.find(
+      (u) => u.university.toLowerCase() === schoolName.toLowerCase()
+    )?.colors || {};
+
   const joined = ride.passengers.includes(userEmail);
+  const remainingSeats = ride.seatsAvailable - ride.passengers.length;
 
   return (
     <Box
       sx={{
-        background: "linear-gradient(145deg, #ffffff, #f9fafb)",
+        background: colors.card_bg || "#fff",
         borderRadius: "12px",
-        padding: "18px",
-        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+        boxShadow: `0 2px 8px ${colors.card_shadow || "rgba(0,0,0,0.08)"}`,
+        p: 3,
         transition: "transform 0.2s ease, box-shadow 0.2s ease",
         opacity: 0,
         animation: "fadeInUp 0.4s ease forwards",
         animationDelay: `${index * 0.05}s`,
         "&:hover": {
-          transform: "translateY(-4px)",
-          boxShadow: "0 6px 16px rgba(0, 0, 0, 0.12)",
+          transform: "translateY(-3px)",
+          boxShadow: `0 6px 16px ${
+            colors.card_shadow || "rgba(0,0,0,0.12)"
+          }`,
         },
         "@keyframes fadeInUp": {
-          from: {
-            opacity: 0,
-            transform: "translateY(20px)",
-          },
-          to: {
-            opacity: 1,
-            transform: "translateY(0)",
-          },
+          from: { opacity: 0, transform: "translateY(20px)" },
+          to: { opacity: 1, transform: "translateY(0)" },
         },
       }}
     >
-      <Typography
-        variant="h6"
+      <Box
         sx={{
-          margin: "0 0 6px",
-          color: "#00263a",
-          fontSize: "17px",
-          fontWeight: 600,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          mb: 1,
         }}
       >
-        {ride.from} → {ride.destination}
-      </Typography>
+        <Box>
+          <Typography
+            sx={{
+              fontSize: "1.05rem",
+              fontWeight: 600,
+              color: colors.text_primary || "#1e293b",
+            }}
+          >
+            {ride.from} → {ride.destination}
+          </Typography>
+          <Typography
+            sx={{
+              fontSize: "0.85rem",
+              color: colors.text_secondary || "#6b7280",
+              mt: 0.2,
+            }}
+          >
+            {ride.departureDate} · {ride.departureTime}
+          </Typography>
+        </Box>
 
-      <Typography
-        variant="body2"
+        {joined && (
+          <Box
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              background: "#d1fae5",
+              color: "#065f46",
+              borderRadius: "12px",
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+            }}
+          >
+            Joined
+          </Box>
+        )}
+      </Box>
+
+      <Divider sx={{ my: 1.5 }} />
+
+      <Box
         sx={{
-          color: "#6b7280",
-          fontSize: "13px",
+          display: "flex",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          rowGap: 0.8,
         }}
       >
-        📅 {ride.departureDate} • 🕓 {ride.departureTime} • 👥{" "}
-        {ride.seatsAvailable - ride.passengers.length} seats
-      </Typography>
-
-      {joined && (
-        <Box
+        <Typography
           sx={{
-            display: "inline-block",
-            background: "#d1fae5",
-            color: "#065f46",
-            padding: "4px 10px",
-            borderRadius: "12px",
-            fontSize: "12px",
-            fontWeight: 600,
-            marginTop: "8px",
+            fontSize: "0.9rem",
+            color: colors.text_secondary || "#475569",
           }}
         >
-          Your Ride
-        </Box>
+          <strong>Driver:</strong> {ride.driverEmail}
+        </Typography>
+        <Typography
+          sx={{
+            fontSize: "0.9rem",
+            color: colors.text_secondary || "#475569",
+          }}
+        >
+          <strong>Seats Left:</strong> {remainingSeats}
+        </Typography>
+        <Typography
+          sx={{
+            fontSize: "0.9rem",
+            color: colors.text_secondary || "#475569",
+          }}
+        >
+          <strong>Distance:</strong> {ride.distance} mi
+        </Typography>
+      </Box>
+
+      {ride.notes && (
+        <Typography
+          sx={{
+            mt: 1.5,
+            fontSize: "0.875rem",
+            lineHeight: 1.5,
+            color: colors.text_secondary || "#6b7280",
+            fontStyle: "italic",
+          }}
+        >
+          "{ride.notes}"
+        </Typography>
       )}
 
-      <Box sx={{ display: "flex", gap: "12px", marginTop: "12px" }}>
+      <Box sx={{ display: "flex", gap: 1.5, mt: 2 }}>
         {joined ? (
           <Button
             onClick={() => leaveRide(ride.id)}
             sx={{
-              background: "#e5e7eb",
-              color: "#374151",
-              border: "none",
+              flex: 1,
+              background: colors.button_secondary_hover_bg || "#f3f4f6",
+              color: colors.text_primary || "#374151",
               borderRadius: "8px",
-              padding: "12px 20px",
-              fontSize: "15px",
-              fontWeight: 600,
+              py: 1,
               textTransform: "none",
-              transition: "all 0.2s ease",
+              fontWeight: 500,
+              fontSize: "0.95rem",
               "&:hover": {
-                background: "#d1d5db",
+                background: "#e5e7eb",
               },
             }}
           >
@@ -96,23 +160,21 @@ const RideCard = ({ ride, userEmail, joinRide, leaveRide, index = 0 }) => {
           <Button
             onClick={() => joinRide(ride.id)}
             sx={{
-              background: "linear-gradient(135deg, #006d5b, #008c70)",
-              color: "white",
-              border: "none",
+              flex: 1,
+              background:
+                colors.button_primary_bg ||
+                "linear-gradient(135deg, #334155, #1e293b)",
+              color: colors.button_primary_text || "#fff",
               borderRadius: "8px",
-              padding: "12px 20px",
-              fontSize: "15px",
-              fontWeight: 600,
+              py: 1,
               textTransform: "none",
-              transition: "transform 0.2s ease, box-shadow 0.2s ease",
-              boxShadow: "0 2px 8px rgba(0, 109, 91, 0.3)",
+              fontWeight: 500,
+              fontSize: "0.95rem",
+              boxShadow: "0 2px 5px rgba(0,0,0,0.12)",
               "&:hover": {
-                transform: "translateY(-2px)",
-                boxShadow: "0 4px 12px rgba(0, 109, 91, 0.4)",
-                background: "linear-gradient(135deg, #006d5b, #008c70)",
-              },
-              "&:active": {
-                transform: "translateY(0)",
+                background:
+                  colors.button_primary_hover ||
+                  "linear-gradient(135deg, #1e293b, #0f172a)",
               },
             }}
           >
@@ -120,20 +182,6 @@ const RideCard = ({ ride, userEmail, joinRide, leaveRide, index = 0 }) => {
           </Button>
         )}
       </Box>
-
-      {ride.notes && (
-        <Typography
-          variant="body2"
-          sx={{
-            marginTop: "12px",
-            fontStyle: "italic",
-            color: "#6b7280",
-            fontSize: "13px",
-          }}
-        >
-          "{ride.notes}"
-        </Typography>
-      )}
     </Box>
   );
 };

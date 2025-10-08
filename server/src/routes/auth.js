@@ -133,15 +133,10 @@ router.post("/check-code", verifyCodeLimiter, (req, res) => {
     (u) => u.name.toLowerCase() === record.school.toLowerCase()
   );
 
-  const colors =
-    uni && Array.isArray(uni.colors) && uni.colors.length > 0
-      ? uni.colors
-      : ["#00263A", "#335a6d"];
-
   res.json({
     message: "Email verified successfully!",
     token,
-    user: { email, school: record.school, state: uni.state ,colors },
+    user: { email, school: record.school, state: uni.state },
   });
 });
 

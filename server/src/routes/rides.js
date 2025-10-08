@@ -9,13 +9,14 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import rateLimit from "express-rate-limit";
+import { logDebug } from "../utils/logger.js"; // 👈 import debug logger
+import { log } from "console";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UNIVERSITIES_PATH = path.join(__dirname, "../data/us_universities.json");
-
 const CITIES_PATH = path.join(__dirname, "../data/us_cities.json");
-const universities = JSON.parse(fs.readFileSync(UNIVERSITIES_PATH, "utf-8"));
 
+const universities = JSON.parse(fs.readFileSync(UNIVERSITIES_PATH, "utf-8"));
 const cities = JSON.parse(fs.readFileSync(CITIES_PATH, "utf-8"));
 
 const router = Router();
@@ -45,6 +46,8 @@ router.get("/locations", authenticateToken, locationsLimiter, (req, res) => {
     const { school, miles, query } = req.query;
     const distance = Number(miles) || 100;
 
+    logDebug("GET /locations", { school, miles, query, distance });
+
     if (!school) {
       return res.status(400).json({ message: "School parameter required" });
     }
@@ -57,7 +60,6 @@ router.get("/locations", authenticateToken, locationsLimiter, (req, res) => {
       return res.status(404).json({ message: "University not found" });
     }
 
-    // Get nearby cities
     const nearbyCities = findNearbyCitiesDynamic(
       university.lat,
       university.lng,
@@ -65,8 +67,6 @@ router.get("/locations", authenticateToken, locationsLimiter, (req, res) => {
     );
 
     let cityNames = nearbyCities.map((c) => `${c.city}, ${c.state}`);
-
-    // Filter by query if provided
     if (query && query.trim() !== "") {
       const lowerQuery = query.toLowerCase();
       cityNames = cityNames.filter((name) =>
@@ -74,9 +74,10 @@ router.get("/locations", authenticateToken, locationsLimiter, (req, res) => {
       );
     }
 
-    // Add campus as first option
     const campusOption = school;
     const allLocations = [campusOption, ...cityNames];
+
+    logDebug("Nearby locations result count:", allLocations.length);
 
     res.json({
       from: allLocations,
@@ -91,35 +92,39 @@ router.get("/locations", authenticateToken, locationsLimiter, (req, res) => {
 // Search rides, if From and To provided then radius is ignored
 router.post("/search", authenticateToken, searchLimiter, async (req, res) => {
   try {
-    console.log("Search request body:", req.body);
-    const { from, to, radius, school } = req.body;
+    logDebug("Received /search request with body:", req.body);
+    const { radius, school, date } = req.body;
+    let from = req.body.from || null;
+    let to = req.body.to || null;
+
+    // Default radius to 100 miles if not provided or invalid
     const searchRadius = radius ? Number(radius) : 100;
+
+    // If radius is not 100 miles, dont use from/to filters
+    if (searchRadius !== 100) {
+      from = null;
+      to = null;
+    }
+
+    logDebug("POST /search body:", { from, to, radius, school, date });
 
     if (!school) {
       return res.status(400).json({ message: "School parameter required" });
     }
 
-    // Get all rides for this school
     let rides = await db.findRides({ school });
-    console.log(`Found ${rides.length} rides for school ${school}`);
-    console.log("Rides:", rides);
+    logDebug(`Found ${rides.length} rides for ${school}`);
 
-    // Filter by from/to
     rides = rides.filter((ride) => {
       if (from && from !== ride.from) return false;
       if (to && to !== ride.destination) return false;
-
-      if (from && to) return true; // if both provided, ignore radius entirely
-
-      // if only one of from/to specified or neither, filter by radius
+      if (date && date !== ride.departureDate) return false;
+      if (from && to) return true;
       return searchRadius >= ride.distance;
     });
 
-    console.log(`After filtering, ${rides.length} rides remain:`, rides);
+    logDebug(`Filtered rides count: ${rides.length}`);
 
-    console.log(`After filtering, ${rides.length} rides remain:`, rides);
-
-    // Sort by departure date
     rides.sort((a, b) => new Date(a.departureDate) - new Date(b.departureDate));
 
     res.json(rides);
@@ -136,6 +141,8 @@ router.get("/mine/created", authenticateToken, rideLimiter, (req, res) => {
     const rides = db
       .findRides({ driverEmail: email })
       .sort((a, b) => new Date(a.departureDate) - new Date(b.departureDate));
+
+    logDebug(`GET /mine/created for ${email}:`, rides.length);
     res.json(rides);
   } catch (err) {
     console.error("Error fetching created rides:", err);
@@ -151,6 +158,8 @@ router.get("/mine/joined", authenticateToken, rideLimiter, (req, res) => {
       .getRides()
       .filter((ride) => ride.passengers?.includes(email))
       .sort((a, b) => new Date(a.departureDate) - new Date(b.departureDate));
+
+    logDebug(`GET /mine/joined for ${email}:`, rides.length);
     res.json(rides);
   } catch (err) {
     console.error("Error fetching joined rides:", err);
@@ -160,7 +169,6 @@ router.get("/mine/joined", authenticateToken, rideLimiter, (req, res) => {
 
 // Create ride
 router.post("/", authenticateToken, rideLimiter, (req, res) => {
-  console.log("Create ride body:", req.body);
   try {
     const {
       from,
@@ -171,16 +179,26 @@ router.post("/", authenticateToken, rideLimiter, (req, res) => {
       notes,
     } = req.body;
 
+    logDebug("POST / (create ride) body:", {
+      from,
+      destination,
+      departureDate,
+      departureTime,
+      seatsAvailable,
+      notes,
+    });
+
     let fromLat, fromLng, toLat, toLng;
 
-    if (universities.find((u) => u.name.toLowerCase() === from.toLowerCase())) {   
-      let university = universities.find(
+    if (universities.find((u) => u.name.toLowerCase() === from.toLowerCase())) {
+      const university = universities.find(
         (u) => u.name.toLowerCase() === from.toLowerCase()
       );
       fromLat = university.lat;
       fromLng = university.lng;
-      let city = cities.find(
-        (c) => c.city.toLowerCase() === destination.split(",")[0].trim().toLowerCase()
+      const city = cities.find(
+        (c) =>
+          c.city.toLowerCase() === destination.split(",")[0].trim().toLowerCase()
       );
       toLat = city?.lat;
       toLng = city?.lng;
@@ -189,26 +207,31 @@ router.post("/", authenticateToken, rideLimiter, (req, res) => {
         (u) => u.name.toLowerCase() === destination.toLowerCase()
       )
     ) {
-      let university = universities.find(
+      const university = universities.find(
         (u) => u.name.toLowerCase() === destination.toLowerCase()
       );
       toLat = university.lat;
       toLng = university.lng;
-      let city = cities.find(
-        (c) => c.city.toLowerCase() === from.split(",")[0].trim().toLowerCase()
+      const city = cities.find(
+        (c) =>
+          c.city.toLowerCase() === from.split(",")[0].trim().toLowerCase()
       );
       fromLat = city?.lat;
       fromLng = city?.lng;
     } else {
+      logDebug("Create ride validation failed: no university found.");
       return res.status(400).json({ message: "One location must be a campus" });
     }
 
-    if (!fromLat || !fromLng || !toLat || !toLng)
+    if (!fromLat || !fromLng || !toLat || !toLng) {
+      logDebug("Invalid coordinates for new ride.");
       return res.status(400).json({ message: "Invalid from or destination" });
+    }
 
     if (!from || !destination || !departureDate || !departureTime || !seatsAvailable)
       return res.status(400).json({ message: "Missing required fields" });
 
+    const distance = getDistanceInMiles(fromLat, fromLng, toLat, toLng).toFixed(2);
     const newRide = db.createRide({
       driverEmail: req.user?.email,
       school: req.user?.school,
@@ -218,8 +241,10 @@ router.post("/", authenticateToken, rideLimiter, (req, res) => {
       departureTime,
       seatsAvailable,
       notes: notes || "",
-      distance: getDistanceInMiles(fromLat, fromLng, toLat, toLng).toFixed(2),
+      distance,
     });
+
+    logDebug("Ride created:", newRide);
 
     res.status(201).json(newRide);
   } catch (err) {
@@ -233,6 +258,8 @@ router.post("/:id/join", authenticateToken, rideLimiter, (req, res) => {
   try {
     const { id } = req.params;
     const email = req.user?.email;
+
+    logDebug(`POST /${id}/join by ${email}`);
 
     const result = db.joinRide(id, email);
 
@@ -252,6 +279,8 @@ router.post("/:id/leave", authenticateToken, rideLimiter, (req, res) => {
   try {
     const { id } = req.params;
     const email = req.user?.email;
+
+    logDebug(`POST /${id}/leave by ${email}`);
 
     const result = db.leaveRide(id, email);
 
