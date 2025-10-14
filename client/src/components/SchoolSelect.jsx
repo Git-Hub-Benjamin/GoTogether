@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { TextField, MenuItem, Box, CircularProgress } from "@mui/material";
+import React, { useEffect, useState, useMemo } from "react";
+import { Autocomplete, TextField, Box, CircularProgress } from "@mui/material";
 
 const API_URL = "http://localhost:5000/api/schools";
 
@@ -94,47 +94,65 @@ const SchoolSelect = ({
     fetchSchools();
   }, [selectedState, disabled, setSelectedSchool]);
 
+  const stateOptions = useMemo(() => HARD_CODED_STATES.map(state => ({
+    label: state,
+    value: state
+  })), []);
+
+  const schoolOptions = useMemo(() => schools.map(school => ({
+    label: school.name,
+    value: school.name,
+    ...school
+  })), [schools]);
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
-      <TextField
-        select
+      <Autocomplete
         fullWidth
-        label="Select State"
-        value={selectedState}
-        onChange={(e) => {
-          setSelectedState(e.target.value);
+        options={stateOptions}
+        value={selectedState ? { label: selectedState, value: selectedState } : null}
+        onChange={(_, newValue) => {
+          setSelectedState(newValue?.value || "");
           setSelectedSchool(null);
         }}
         disabled={disabled}
-      >
-        {HARD_CODED_STATES.map((s) => (
-          <MenuItem key={s} value={s}>
-            {s}
-          </MenuItem>
-        ))}
-      </TextField>
+        getOptionLabel={(option) => option.label}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label="Select State"
+            sx={{ minWidth: 200 }}
+          />
+        )}
+        isOptionEqualToValue={(option, value) => option.value === value?.value}
+      />
 
-      <TextField
-        select
+      <Autocomplete
         fullWidth
-        label="Select University"
-        disabled={disabled || !selectedState || loading}
-        value={selectedSchool?.name || ""}
-        onChange={(e) => {
-          const school =
-            schools.find((s) => s.name === e.target.value) || null;
-          setSelectedSchool(school);
-        }}
-        InputProps={{
-          endAdornment: loading ? <CircularProgress size={20} /> : null,
-        }}
-      >
-        {schools.map((s) => (
-          <MenuItem key={s.name} value={s.name}>
-            {s.name}
-          </MenuItem>
-        ))}
-      </TextField>
+        options={schoolOptions}
+        value={selectedSchool ? { label: selectedSchool.name, value: selectedSchool.name, ...selectedSchool } : null}
+        onChange={(_, newValue) => setSelectedSchool(newValue)}
+        disabled={!selectedState || disabled}
+        loading={loading}
+        getOptionLabel={(option) => option.label}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label="Select University"
+            sx={{ minWidth: 200 }}
+            InputProps={{
+              ...params.InputProps,
+              endAdornment: (
+                <>
+                  {loading ? <CircularProgress size={20} /> : null}
+                  {params.InputProps.endAdornment}
+                </>
+              ),
+            }}
+          />
+        )}
+        isOptionEqualToValue={(option, value) => option.value === value?.value}
+      />
     </Box>
   );
 };

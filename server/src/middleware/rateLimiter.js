@@ -1,4 +1,4 @@
-// server/src/middleware/rateLimiter.ts
+// server/src/middleware/rateLimiter.js
 import rateLimit from "express-rate-limit";
 
 /**
@@ -7,7 +7,7 @@ import rateLimit from "express-rate-limit";
  */
 export const verifyEmailLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 5, // limit each IP to 5 requests per window
+  max: 25, // limit each IP to 5 requests per window
   message: {
     message: "Too many verification requests. Please try again later.",
   },
@@ -39,6 +39,39 @@ export const nearbyLimiter = rateLimit({
   message: {
     message: "Too many nearby city requests. Please slow down your search.",
   },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
+ * Rate limiter for ride searches
+ */
+export const searchLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { message: "Too many search requests. Please slow down." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
+ * Rate limiter for location requests
+ */
+export const locationsLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: { message: "Too many location requests. Please slow down." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
+ * Rate limiter for ride actions (join, leave, request, etc.)
+ */
+export const rideLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: { message: "Too many ride requests. Please slow down." },
   standardHeaders: true,
   legacyHeaders: false,
 });

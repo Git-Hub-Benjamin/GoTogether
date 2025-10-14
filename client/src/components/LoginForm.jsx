@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { TextField, Button, Box, Typography, IconButton } from "@mui/material";
+import { TextField, Button, Box, Typography, IconButton, Tooltip } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import SchoolSelect from "./SchoolSelect.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -40,7 +41,10 @@ const LoginForm = ({ disabled = false }) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
 
-      setStatus(data.message);
+      // Update status message based on whether code is new or existing
+      setStatus(data.existing 
+        ? "Previous code is still valid. Please enter it below." 
+        : "New verification code sent!");
       setStage("code");
     } catch (err) {
       setError(err.message);
@@ -87,7 +91,8 @@ const LoginForm = ({ disabled = false }) => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             sx={{ mb: 2 }}
-            disabled={disabled}
+            disabled={disabled || !selectedState || !selectedSchool}
+            placeholder={!selectedState ? "Select your state first" : !selectedSchool ? "Select your university first" : "Enter your .edu email"}
           />
 
           {error && (
@@ -115,19 +120,38 @@ const LoginForm = ({ disabled = false }) => {
       {stage === "code" && (
         <>
           <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-            <IconButton
-              onClick={() => {
-                setStage("email");
-                setCode("");
-                setError("");
-                setStatus("");
-              }}
-            >
-              <ArrowBackIcon />
-            </IconButton>
-            <Typography variant="h6" sx={{ ml: 1 }}>
-              Enter the 6-digit Verification Code
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <IconButton
+                onClick={() => {
+                  setStage("email");
+                  setCode("");
+                  setError("");
+                  setStatus("");
+                }}
+              >
+                <ArrowBackIcon />
+              </IconButton>
+              <Typography
+                variant="subtitle1"
+                noWrap
+                sx={{ ml: 1, mr: 1, fontSize: "0.95rem" }}
+              >
+                Enter the 6-digit Verification Code
+              </Typography>
+              <Tooltip title="Resend verification code">
+                <IconButton 
+                  onClick={handleEmailSubmit}
+                  size="small"
+                  sx={{
+                    '&:hover': {
+                      backgroundColor: 'rgba(46, 125, 50, 0.04)'
+                    }
+                  }}
+                >
+                  <RefreshIcon fontSize="small" color="success" />
+                </IconButton>
+              </Tooltip>
+            </Box>
           </Box>
 
           <TextField

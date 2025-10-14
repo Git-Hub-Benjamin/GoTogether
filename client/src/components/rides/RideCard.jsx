@@ -3,7 +3,15 @@ import { Box, Button, Typography, Divider } from "@mui/material";
 import { useAuth } from "../../context/AuthContext.jsx";
 import universityColors from "../../assets/university_colors.json";
 
-const RideCard = ({ ride, userEmail, joinRide, leaveRide, index = 0 }) => {
+const RideCard = ({
+  ride,
+  userEmail,
+  joinRide,
+  leaveRide,
+  approveRequest,
+  rejectRequest,
+  index = 0,
+}) => {
   const { user } = useAuth();
   const schoolName = user?.school || "";
 
@@ -14,6 +22,8 @@ const RideCard = ({ ride, userEmail, joinRide, leaveRide, index = 0 }) => {
     )?.colors || {};
 
   const joined = ride.passengers.includes(userEmail);
+  const isPending = ride.pendingRequests?.includes(userEmail);
+  const isDriver = ride.driverEmail === userEmail;
   const remainingSeats = ride.seatsAvailable - ride.passengers.length;
 
   return (
@@ -39,6 +49,7 @@ const RideCard = ({ ride, userEmail, joinRide, leaveRide, index = 0 }) => {
         },
       }}
     >
+      {/* Header */}
       <Box
         sx={{
           display: "flex",
@@ -68,26 +79,27 @@ const RideCard = ({ ride, userEmail, joinRide, leaveRide, index = 0 }) => {
           </Typography>
         </Box>
 
-        {joined && (
+        {(joined || isPending) && (
           <Box
             sx={{
               px: 1.5,
               py: 0.5,
-              background: "#d1fae5",
-              color: "#065f46",
+              background: joined ? "#d1fae5" : "#fef3c7",
+              color: joined ? "#065f46" : "#92400e",
               borderRadius: "12px",
               fontSize: "0.75rem",
               fontWeight: 600,
               whiteSpace: "nowrap",
             }}
           >
-            Joined
+            {joined ? "Joined" : "Request Pending"}
           </Box>
         )}
       </Box>
 
       <Divider sx={{ my: 1.5 }} />
 
+      {/* Ride Details */}
       <Box
         sx={{
           display: "flex",
@@ -118,7 +130,7 @@ const RideCard = ({ ride, userEmail, joinRide, leaveRide, index = 0 }) => {
             color: colors.text_secondary || "#475569",
           }}
         >
-          <strong>Distance:</strong> {ride.distance} mi
+          <strong>Distance:</strong> {ride.distance} mi
         </Typography>
       </Box>
 
@@ -136,52 +148,99 @@ const RideCard = ({ ride, userEmail, joinRide, leaveRide, index = 0 }) => {
         </Typography>
       )}
 
-      <Box sx={{ display: "flex", gap: 1.5, mt: 2 }}>
-        {joined ? (
-          <Button
-            onClick={() => leaveRide(ride.id)}
-            sx={{
-              flex: 1,
-              background: colors.button_secondary_hover_bg || "#f3f4f6",
-              color: colors.text_primary || "#374151",
-              borderRadius: "8px",
-              py: 1,
-              textTransform: "none",
-              fontWeight: 500,
-              fontSize: "0.95rem",
-              "&:hover": {
-                background: "#e5e7eb",
-              },
-            }}
-          >
-            Leave Ride
-          </Button>
-        ) : (
-          <Button
-            onClick={() => joinRide(ride.id)}
-            sx={{
-              flex: 1,
-              background:
-                colors.button_primary_bg ||
-                "linear-gradient(135deg, #334155, #1e293b)",
-              color: colors.button_primary_text || "#fff",
-              borderRadius: "8px",
-              py: 1,
-              textTransform: "none",
-              fontWeight: 500,
-              fontSize: "0.95rem",
-              boxShadow: "0 2px 5px rgba(0,0,0,0.12)",
-              "&:hover": {
-                background:
-                  colors.button_primary_hover ||
-                  "linear-gradient(135deg, #1e293b, #0f172a)",
-              },
-            }}
-          >
-            Join Ride
-          </Button>
-        )}
-      </Box>
+      {/* Passenger Buttons (only for non-drivers) */}
+      {!isDriver && (
+        <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end" }}>
+          {joined ? (
+            <Button 
+              onClick={() => leaveRide(ride.id)}
+              variant="outlined"
+              color="error"
+              size="small"
+              sx={{
+                borderColor: "#ef4444",
+                color: "#ef4444",
+                "&:hover": {
+                  borderColor: "#dc2626",
+                  backgroundColor: "rgba(239, 68, 68, 0.04)",
+                },
+              }}
+            >
+              Leave Ride
+            </Button>
+          ) : isPending ? (
+            <Button
+              onClick={() => leaveRide(ride.id)}
+              variant="outlined"
+              color="error"
+              size="small"
+              sx={{
+                borderColor: "#ef4444",
+                color: "#ef4444",
+                "&:hover": {
+                  borderColor: "#dc2626",
+                  backgroundColor: "rgba(239, 68, 68, 0.04)",
+                },
+              }}
+            >
+              Cancel Request
+            </Button>
+          ) : (
+            <Button
+              onClick={() => joinRide(ride.id)}
+              variant="contained"
+              size="small"
+              sx={{
+                bgcolor: colors.primary || "#2563eb",
+                "&:hover": {
+                  bgcolor: colors.primary_dark || "#1d4ed8",
+                },
+              }}
+              disabled={remainingSeats === 0}
+            >
+              Request to Join
+            </Button>
+          )}
+        </Box>
+      )}
+
+      {/* Pending approvals (driver only) */}
+      {isDriver && ride.pendingRequests?.length > 0 && (
+        <Box sx={{ mt: 2 }}>
+          <Typography sx={{ fontWeight: 600, mb: 1 }}>
+            Pending Requests ({ride.pendingRequests.length})
+          </Typography>
+
+          {ride.pendingRequests.map((email) => (
+            <Box
+              key={email}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                mb: 1,
+              }}
+            >
+              <Typography>{email}</Typography>
+              <Box>
+                <Button
+                  onClick={() => approveRequest(ride.id, email)}
+                  disabled={remainingSeats === 0}
+                  sx={{ mr: 1 }}
+                >
+                  Accept
+                </Button>
+                <Button
+                  onClick={() => rejectRequest(ride.id, email)}
+                  color="error"
+                >
+                  Decline
+                </Button>
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      )}
     </Box>
   );
 };

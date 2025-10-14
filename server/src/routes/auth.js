@@ -1,7 +1,7 @@
 import { Router } from "express";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
-import rateLimit from "express-rate-limit";
+import { verifyEmailLimiter, verifyCodeLimiter } from "../middleware/rateLimiter.js";
 import { sendVerificationEmail } from "../utils/emailService.js";
 import fs from "fs";
 import path from "path";
@@ -18,63 +18,47 @@ const universities = JSON.parse(
 
 const router = Router();
 
-const verifyEmailLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 5,
-  message: {
-    message: "Too many verification requests. Please try again later.",
-  },
-});
-
-const verifyCodeLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000,
-  max: 25,
-  message: {
-    message:
-      "Too many verification attempts. Please try again later.",
-  },
-});
+// Using imported rate limiters from middleware/rateLimiter.js
 
 const verificationCodes = new Map();
 
 router.post("/verify-email", verifyEmailLimiter, async (req, res) => {
-  
   try {
-    // try to destruct the email and school
     const { email, school } = req.body;
 
     if (!email) {
       return res.status(400).json({ message: "Email is required." });
     }
 
-    // find school
     const university = universities.find(
       (u) => u.name.toLowerCase() === school.toLowerCase()
     );
 
-    // check for existence
     if (!university) {
       return res.status(400).json({ message: "Invalid school." });
     }
 
-    //! fix -- check if a code was already sent and is still valid
+    // Check email domain
+    if (!email.endsWith(university.domains[0])) {
+      return res.status(400).json({ 
+        message: "Please use your valid @" + university.domains[0] + " email address." 
+      });
+    }
+
+    // If there's an existing valid code, return success but indicate it's existing
     if (verificationCodes.has(email)) {
       const record = verificationCodes.get(email);
       if (Date.now() < record.expiry) {
-        return res
-          .status(400)
-          .json({ message: "A code has already been sent to this email." });
+        return res.json({ 
+          message: "Code is still valid. Please enter your code.",
+          email,
+          existing: true
+        });
       }
       verificationCodes.delete(email);
     }
 
-    if (email.endsWith(university.domains[0]) === false) {
-      return res
-        .status(400)
-        .json({ message: "Please use your valid @" + university.domains[0] + " email address." });
-    }
-    
-    // generate 6 digit code
+    // Generate new code
     const code = crypto.randomInt(100000, 999999).toString();
     verificationCodes.set(email, {
       code,
@@ -86,7 +70,11 @@ router.post("/verify-email", verifyEmailLimiter, async (req, res) => {
     console.log(`Verification code for ${email}: ${code}`);
     // await sendVerificationEmail(email, code);
 
-    res.json({ message: "Verification email sent.", email });
+    res.json({ 
+      message: "Verification email sent.",
+      email,
+      existing: false
+    });
   } catch (err) {
     console.error("Error sending email:", err);
     res.status(500).json({ message: "Error sending verification email." });

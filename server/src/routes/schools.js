@@ -2,6 +2,7 @@ import { Router } from "express";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { locationsLimiter } from "../middleware/rateLimiter.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UNIVERSITIES_PATH = path.join(
@@ -14,7 +15,7 @@ const universities = JSON.parse(
 
 const router = Router();
 
-router.get("/:state", (req, res) => {
+router.get("/:state", locationsLimiter, (req, res) => {
   const { state } = req.params;
   const filtered = universities.filter(
     (u) => u.state.toLowerCase() === state.toLowerCase()
@@ -29,7 +30,7 @@ router.get("/:state", (req, res) => {
   );
 });
 
-router.get("/domain/:schoolName", (req, res) => {
+router.get("/domain/:schoolName", locationsLimiter, (req, res) => {
   const { schoolName } = req.params;
   const normalized = decodeURIComponent(schoolName).toLowerCase();
 

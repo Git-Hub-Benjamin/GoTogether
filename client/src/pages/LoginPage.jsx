@@ -80,17 +80,22 @@ const LoginPage = () => {
               mb: 3,
             }}
           >
-            <Typography
-              variant="h5"
-              align="center"
-              fontWeight={600}
-              sx={{
-                color: "#2e7d32",
-                textShadow: "0 1px 2px rgba(0,0,0,0.06)",
-              }}
-            >
-              GoTogether
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography
+                variant="h5"
+                align="center"
+                fontWeight={600}
+                sx={{
+                  color: "#2e7d32",
+                  textShadow: "0 1px 2px rgba(0,0,0,0.06)",
+                }}
+              >
+                GoTogether
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                v1.0
+              </Typography>
+            </Box>
 
             {serverOnline === null ? (
               <CircularProgress size={16} />

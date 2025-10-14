@@ -8,9 +8,10 @@ import { db } from "../utils/db.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import rateLimit from "express-rate-limit";
-import { logDebug } from "../utils/logger.js"; // 👈 import debug logger
-import { log } from "console";
+import { logDebug } from "../utils/logger.js";
+import { sendRequestEmail } from "../utils/emailService.js";
+import { checkRideCooldown, checkRequestLimit, setCooldown } from "../middleware/rideCooldown.js";
+import { searchLimiter, locationsLimiter, rideLimiter } from "../middleware/rateLimiter.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UNIVERSITIES_PATH = path.join(__dirname, "../data/us_universities.json");
@@ -21,24 +22,7 @@ const cities = JSON.parse(fs.readFileSync(CITIES_PATH, "utf-8"));
 
 const router = Router();
 
-// Rate limiters
-const searchLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  message: { message: "Too many search requests. Please slow down." },
-});
-
-const locationsLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 60,
-  message: { message: "Too many location requests. Please slow down." },
-});
-
-const rideLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 20,
-  message: { message: "Too many ride requests. Please slow down." },
-});
+// Using imported rate limiters from middleware/rateLimiter.js
 
 // Get nearby locations with optional search query
 router.get("/locations", authenticateToken, locationsLimiter, (req, res) => {
@@ -46,7 +30,10 @@ router.get("/locations", authenticateToken, locationsLimiter, (req, res) => {
     const { school, miles, query } = req.query;
     const distance = Number(miles) || 100;
 
-    logDebug("GET /locations", { school, miles, query, distance });
+    logDebug("GET /locations - Request", {
+      params: { school, miles, query },
+      normalized: { distance }
+    });
 
     if (!school) {
       return res.status(400).json({ message: "School parameter required" });
@@ -93,9 +80,11 @@ router.get("/locations", authenticateToken, locationsLimiter, (req, res) => {
 router.post("/search", authenticateToken, searchLimiter, async (req, res) => {
   try {
     logDebug("Received /search request with body:", req.body);
-    const { radius, school, date } = req.body;
+    const { school } = req.body;
     let from = req.body.from || null;
     let to = req.body.to || null;
+    let radius = req.body.radius || null;
+    let date = req.body.date || null;
 
     // Default radius to 100 miles if not provided or invalid
     const searchRadius = radius ? Number(radius) : 100;
@@ -106,24 +95,25 @@ router.post("/search", authenticateToken, searchLimiter, async (req, res) => {
       to = null;
     }
 
-    logDebug("POST /search body:", { from, to, radius, school, date });
-
     if (!school) {
       return res.status(400).json({ message: "School parameter required" });
     }
 
     let rides = await db.findRides({ school });
-    logDebug(`Found ${rides.length} rides for ${school}`);
+    // logDebug("POST /search - Initial results", {
+    //   school,
+    //   foundRides: rides.length
+    // });
 
     rides = rides.filter((ride) => {
+      // Exclude rides created by the requesting user
+      if (ride.driverEmail === req.user?.email) return false;
       if (from && from !== ride.from) return false;
       if (to && to !== ride.destination) return false;
       if (date && date !== ride.departureDate) return false;
       if (from && to) return true;
       return searchRadius >= ride.distance;
     });
-
-    logDebug(`Filtered rides count: ${rides.length}`);
 
     rides.sort((a, b) => new Date(a.departureDate) - new Date(b.departureDate));
 
@@ -142,7 +132,11 @@ router.get("/mine/created", authenticateToken, rideLimiter, (req, res) => {
       .findRides({ driverEmail: email })
       .sort((a, b) => new Date(a.departureDate) - new Date(b.departureDate));
 
-    logDebug(`GET /mine/created for ${email}:`, rides.length);
+    logDebug("GET /mine/created", {
+      userEmail: email,
+      ridesCount: rides.length,
+      dates: rides.map(r => r.departureDate)
+    });
     res.json(rides);
   } catch (err) {
     console.error("Error fetching created rides:", err);
@@ -159,7 +153,11 @@ router.get("/mine/joined", authenticateToken, rideLimiter, (req, res) => {
       .filter((ride) => ride.passengers?.includes(email))
       .sort((a, b) => new Date(a.departureDate) - new Date(b.departureDate));
 
-    logDebug(`GET /mine/joined for ${email}:`, rides.length);
+    logDebug("GET /mine/joined", {
+      userEmail: email,
+      ridesCount: rides.length,
+      dates: rides.map(r => r.departureDate)
+    });
     res.json(rides);
   } catch (err) {
     console.error("Error fetching joined rides:", err);
@@ -179,13 +177,17 @@ router.post("/", authenticateToken, rideLimiter, (req, res) => {
       notes,
     } = req.body;
 
-    logDebug("POST / (create ride) body:", {
-      from,
-      destination,
-      departureDate,
-      departureTime,
-      seatsAvailable,
-      notes,
+    logDebug("POST /rides - Create ride request", {
+      driver: req.user?.email,
+      school: req.user?.school,
+      details: {
+        from,
+        destination,
+        departureDate,
+        departureTime,
+        seatsAvailable,
+        hasNotes: !!notes
+      }
     });
 
     let fromLat, fromLng, toLat, toLng;
@@ -219,13 +221,23 @@ router.post("/", authenticateToken, rideLimiter, (req, res) => {
       fromLat = city?.lat;
       fromLng = city?.lng;
     } else {
-      logDebug("Create ride validation failed: no university found.");
-      return res.status(400).json({ message: "One location must be a campus" });
+    logDebug("POST /rides - Validation failed", {
+      error: "No university found in locations",
+      from,
+      destination
+    });
+    return res.status(400).json({ message: "One location must be a campus" });
     }
 
     if (!fromLat || !fromLng || !toLat || !toLng) {
-      logDebug("Invalid coordinates for new ride.");
-      return res.status(400).json({ message: "Invalid from or destination" });
+    logDebug("POST /rides - Validation failed", {
+      error: "Invalid coordinates",
+      coordinates: {
+        from: { lat: fromLat, lng: fromLng },
+        to: { lat: toLat, lng: toLng }
+      }
+    });
+    return res.status(400).json({ message: "Invalid from or destination" });
     }
 
     if (!from || !destination || !departureDate || !departureTime || !seatsAvailable)
@@ -244,7 +256,19 @@ router.post("/", authenticateToken, rideLimiter, (req, res) => {
       distance,
     });
 
-    logDebug("Ride created:", newRide);
+    logDebug("POST /rides - Success", {
+      rideId: newRide.id,
+      driver: newRide.driverEmail,
+      route: {
+        from: newRide.from,
+        to: newRide.destination,
+        distance: newRide.distance
+      },
+      departure: {
+        date: newRide.departureDate,
+        time: newRide.departureTime
+      }
+    });
 
     res.status(201).json(newRide);
   } catch (err) {
@@ -254,25 +278,31 @@ router.post("/", authenticateToken, rideLimiter, (req, res) => {
 });
 
 // Join ride
-router.post("/:id/join", authenticateToken, rideLimiter, (req, res) => {
-  try {
-    const { id } = req.params;
-    const email = req.user?.email;
+// router.post("/:id/join", authenticateToken, rideLimiter, (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const email = req.user?.email;
 
-    logDebug(`POST /${id}/join by ${email}`);
+//     logDebug("POST /rides/:id/join", {
+//       rideId: id,
+//       userEmail: email,
+//       action: "join"
+//     });
 
-    const result = db.joinRide(id, email);
+//     const result = db.joinRide(id, email);
 
-    if (result.error) {
-      return res.status(400).json({ message: result.error });
-    }
+//     logDebug("Join ride result:", result);
 
-    res.json(result);
-  } catch (err) {
-    console.error("Error joining ride:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
+//     if (result.error) {
+//       return res.status(400).json({ message: result.error });
+//     }
+
+//     res.json(result);
+//   } catch (err) {
+//     console.error("Error joining ride:", err);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
 
 // Leave ride
 router.post("/:id/leave", authenticateToken, rideLimiter, (req, res) => {
@@ -280,7 +310,11 @@ router.post("/:id/leave", authenticateToken, rideLimiter, (req, res) => {
     const { id } = req.params;
     const email = req.user?.email;
 
-    logDebug(`POST /${id}/leave by ${email}`);
+    logDebug("POST /rides/:id/leave", {
+      rideId: id,
+      userEmail: email,
+      action: "leave"
+    });
 
     const result = db.leaveRide(id, email);
 
@@ -291,6 +325,195 @@ router.post("/:id/leave", authenticateToken, rideLimiter, (req, res) => {
     res.json(result);
   } catch (err) {
     console.error("Error leaving ride:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Request to join ride
+router.post("/:id/request", 
+  authenticateToken, 
+  rideLimiter, 
+  checkRideCooldown,
+  checkRequestLimit,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const email = req.user?.email;
+
+      logDebug("POST /rides/:id/request", {
+        rideId: id,
+        requesterEmail: email,
+        action: "request_to_join"
+      });
+
+      const ride = db.findRideById(id);
+      if (!ride) {
+        return res.status(404).json({ message: "Ride not found" });
+      }
+
+      const result = db.requestToJoinRide(id, email);
+      if (result.error) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      logDebug("Request to join ride successful", {
+        rideId: id,
+        requesterEmail: email,
+        driverEmail: ride.driverEmail
+      });
+
+      // Send email to driver
+      await sendRequestEmail(
+        ride.driverEmail, 
+        email,
+        ride.from,
+        ride.destination,
+        ride.departureDate
+      );
+
+      res.json(result);
+    } catch (err) {
+      console.error("Error requesting to join ride:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
+// Approve join request
+router.post("/:id/approve/:email", authenticateToken, rideLimiter, (req, res) => {
+  try {
+    const { id, email } = req.params;
+    const driverEmail = req.user?.email;
+
+    logDebug("POST /rides/:id/approve/:email", {
+      rideId: id,
+      driverEmail,
+      requestedEmail: email,
+      action: "approve_request"
+    });
+
+    const ride = db.findRideById(id);
+    if (!ride || ride.driverEmail !== driverEmail) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const result = db.approveJoinRequest(id, email);
+    if (result.error) {
+      return res.status(400).json({ message: result.error });
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error("Error approving join request:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Reject join request
+router.post("/:id/reject/:email", authenticateToken, rideLimiter, (req, res) => {
+  try {
+    const { id, email } = req.params;
+    const driverEmail = req.user?.email;
+
+    logDebug("POST /rides/:id/reject/:email", {
+      rideId: id,
+      driverEmail,
+      requestedEmail: email,
+      action: "reject_request"
+    });
+
+    const ride = db.findRideById(id);
+    if (!ride || ride.driverEmail !== driverEmail) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const result = db.rejectJoinRequest(id, email);
+    if (result.error) {
+      return res.status(400).json({ message: result.error });
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error("Error rejecting join request:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Cancel join request (by requestor)
+router.post("/:id/cancel-request", authenticateToken, rideLimiter, (req, res) => {
+  try {
+    const { id } = req.params;
+    const email = req.user?.email;
+
+    logDebug("POST /rides/:id/cancel-request", {
+      rideId: id,
+      userEmail: email,
+      action: "cancel_request"
+    });
+
+    const ride = db.findRideById(id);
+    if (!ride) {
+      return res.status(404).json({ error: "Ride not found" });
+    }
+
+    if (!ride.pendingRequests.includes(email)) {
+      return res.status(400).json({ error: "No pending request found" });
+    }
+
+    ride.pendingRequests = ride.pendingRequests.filter(e => e !== email);
+    
+    // Set cooldown when request is cancelled
+    setCooldown(email, id);
+    
+    logDebug("Request cancelled successfully", {
+      rideId: id,
+      userEmail: email,
+      remainingRequests: ride.pendingRequests.length
+    });
+
+    res.json(ride);
+  } catch (err) {
+    console.error("Error cancelling join request:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Delete ride
+router.delete("/:id", authenticateToken, rideLimiter, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const driverEmail = req.user?.email;
+
+    const ride = db.findRideById(id);
+    if (!ride) {
+      return res.status(404).json({ message: "Ride not found" });
+    }
+
+    if (ride.driverEmail !== driverEmail) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    // Get all affected users before deleting
+    const affectedUsers = [
+      ...ride.passengers,
+      ...ride.pendingRequests
+    ];
+
+    // Delete the ride
+    db.deleteRide(id);
+
+    // Send emails to all affected users
+    for (const userEmail of affectedUsers) {
+      await sendRideDeletedEmail(
+        userEmail,
+        ride.from,
+        ride.destination,
+        ride.departureDate
+      );
+    }
+
+    res.json({ message: "Ride deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting ride:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
