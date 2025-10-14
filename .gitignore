@@ -6,6 +6,8 @@
 # 1. Project-specific Ignored Files
 # -----------------------------------------------
 
+server/src/scripts/generate_token.js
+
 # Environment variables (sensitive information)
 .env
 
