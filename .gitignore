@@ -32,4 +32,4 @@ server/dist/
 # Assuming your Python files might live at the root or in a 'scripts' folder
 *.pyc
 __pycache__/
-venv/                       # Your Python virtual environment
+**/venv/                       # Your Python virtual environment
