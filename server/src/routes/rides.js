@@ -304,7 +304,7 @@ router.post("/", authenticateToken, rideLimiter, (req, res) => {
 //   }
 // });
 
-// Leave ride
+// Leave ride (for passengers)
 router.post("/:id/leave", authenticateToken, rideLimiter, (req, res) => {
   try {
     const { id } = req.params;
@@ -322,6 +322,12 @@ router.post("/:id/leave", authenticateToken, rideLimiter, (req, res) => {
       return res.status(404).json({ message: result.error });
     }
 
+    logDebug("Leave ride successful", {
+      rideId: id,
+      userEmail: email,
+      remainingPassengers: result.passengers.length
+    });
+
     res.json(result);
   } catch (err) {
     console.error("Error leaving ride:", err);
@@ -329,7 +335,49 @@ router.post("/:id/leave", authenticateToken, rideLimiter, (req, res) => {
   }
 });
 
-// Request to join ride
+// Remove passenger (for drivers)
+router.post("/:id/remove/:email", authenticateToken, rideLimiter, (req, res) => {
+  try {
+    const { id, email: passengerEmail } = req.params;
+    const driverEmail = req.user?.email;
+
+    logDebug("POST /rides/:id/remove/:email", {
+      rideId: id,
+      driverEmail,
+      passengerEmail,
+      action: "remove_passenger"
+    });
+
+    const ride = db.getRide(id);
+    if (!ride) {
+      return res.status(404).json({ message: "Ride not found" });
+    }
+
+    // Only the driver can remove passengers
+    if (ride.driver !== driverEmail) {
+      return res.status(403).json({ message: "Only the driver can remove passengers" });
+    }
+
+    const result = db.leaveRide(id, passengerEmail);
+    if (result.error) {
+      return res.status(404).json({ message: result.error });
+    }
+
+    logDebug("Remove passenger successful", {
+      rideId: id,
+      driverEmail,
+      passengerEmail,
+      remainingPassengers: result.passengers.length
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error("Error removing passenger:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Request to join a ride
 router.post("/:id/request", 
   authenticateToken, 
   rideLimiter, 

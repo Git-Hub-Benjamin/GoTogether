@@ -291,6 +291,7 @@ const DashboardPage = () => {
             onCreateRide={() => setModalOpen(true)}
             onCancelRequest={cancelRequest}
             onDelete={deleteRide}
+            onFetchRides={fetchMyRides}
           />
         </Box>
       </Container>

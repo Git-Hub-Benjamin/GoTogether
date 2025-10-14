@@ -67,8 +67,7 @@ router.post("/verify-email", verifyEmailLimiter, async (req, res) => {
       expiry: Date.now() + 10 * 60 * 1000,
     });
 
-    console.log(`Verification code for ${email}: ${code}`);
-    // await sendVerificationEmail(email, code);
+    await sendVerificationEmail(email, code);
 
     res.json({ 
       message: "Verification email sent.",

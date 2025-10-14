@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Button, Typography } from "@mui/material";
 import { useAuth } from "../../context/AuthContext";
 import universityColors from "../../assets/university_colors.json";
+import { calculateEstimatedGasCost } from "../../utils/calculateGasCost.js";
 
 const MyRidesSection = ({ 
   active, 
@@ -9,17 +10,85 @@ const MyRidesSection = ({
   myJoinedRides, 
   myRequestedRides,
   onCreateRide,
-  onCancelRequest
+  onCancelRequest,
+  onFetchRides
 }) => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const empty = myCreatedRides.length === 0 && myJoinedRides.length === 0 && myRequestedRides.length === 0;
+  const API_URL = "http://localhost:5000/api/rides";
 
   const colors =
     universityColors.find(
       (u) => u.university.toLowerCase() === (user?.school || "").toLowerCase()
     )?.colors || {};
 
-    console.log("My Created Rides:", myCreatedRides);
+  const handleApprove = async (rideId, requesterEmail) => {
+    try {
+      const response = await fetch(`${API_URL}/${rideId}/approve/${requesterEmail}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to approve request');
+      onFetchRides(); // Refresh rides after approval
+    } catch (error) {
+      console.error('Error approving request:', error);
+    }
+  };
+
+  const handleReject = async (rideId, requesterEmail) => {
+    try {
+      const response = await fetch(`${API_URL}/${rideId}/reject/${requesterEmail}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to reject request');
+      onFetchRides(); // Refresh rides after rejection
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+    }
+  };
+
+  const handleRemovePassenger = async (rideId, passengerEmail) => {
+    try {
+      const response = await fetch(`${API_URL}/${rideId}/remove/${passengerEmail}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to remove passenger');
+      onFetchRides(); // Refresh rides after passenger removal
+    } catch (error) {
+      console.error('Error removing passenger:', error);
+    }
+  };
+
+  const handleLeaveRide = async (rideId) => {
+    try {
+      const response = await fetch(`${API_URL}/${rideId}/leave`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to leave ride');
+      onFetchRides(); // Refresh rides after leaving
+    } catch (error) {
+      console.error('Error leaving ride:', error);
+    }
+  };
 
   return (
     <Box
@@ -94,7 +163,18 @@ const MyRidesSection = ({
                 </Typography>
 
                 {myCreatedRides.map((ride, index) => (
-                  <RideCardCompact key={ride.id} ride={ride} colors={colors} index={index} label="Your Ride" />
+                  <RideCardCompact 
+                    key={ride.id} 
+                    ride={ride} 
+                    colors={colors} 
+                    index={index} 
+                    label="Your Ride"
+                    onApprove={handleApprove}
+                    onReject={handleReject}
+                    onRemovePassenger={handleRemovePassenger}
+                    isJoinedRide={false}
+                    user={user}
+                  />
                 ))}
               </>
             )}
@@ -187,6 +267,9 @@ const MyRidesSection = ({
                     ride={ride}
                     colors={colors}
                     index={index + myCreatedRides.length}
+                    onLeaveRide={handleLeaveRide}
+                    isJoinedRide={true}
+                    user={user}
                   />
                 ))}
               </>
@@ -232,7 +315,11 @@ const MyRidesSection = ({
 };
 
 // In RideCardCompact component
-const RideCardCompact = ({ ride, colors, label, onDelete }) => {
+const RideCardCompact = ({ ride, colors, label, onDelete, onApprove, onReject, onRemovePassenger, onLeaveRide, isJoinedRide }) => {
+  const seatsLeft = parseInt(ride.seatsAvailable) - (ride.passengers?.length || 0);
+  const hasPendingRequests = ride.pendingRequests?.length > 0;
+  const { user } = useAuth();
+
   return (
     <Box
       sx={{
@@ -244,6 +331,7 @@ const RideCardCompact = ({ ride, colors, label, onDelete }) => {
         animation: "fadeInUp 0.3s ease forwards",
       }}
     >
+      {/* Header with Route and Actions */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Box>
           <Typography
@@ -262,7 +350,7 @@ const RideCardCompact = ({ ride, colors, label, onDelete }) => {
               fontSize: "13px",
             }}
           >
-            📅 {ride.departureDate} • 🕓 {ride.departureTime}
+            {ride.departureDate} at {ride.departureTime}
           </Typography>
         </Box>
         
@@ -285,11 +373,218 @@ const RideCardCompact = ({ ride, colors, label, onDelete }) => {
         )}
       </Box>
 
+      {/* Ride Details */}
+      <Box sx={{ mt: 2 }}>
+        {/* Distance, Gas Cost, and Created Info */}
+        <Typography
+          sx={{
+            color: colors.text_secondary || "#64748b",
+            fontSize: "13px",
+            mb: 1,
+          }}
+        >
+          <strong>Distance:</strong> {ride.distance} miles • <strong>Est. Gas:</strong> ~${calculateEstimatedGasCost(ride.distance, ride.passengers.length)}/person
+        </Typography>
+        <Typography
+          sx={{
+            color: colors.text_secondary || "#64748b",
+            fontSize: "13px",
+            mb: 1,
+          }}
+        >
+          <strong>Created:</strong> {new Date(ride.createdAt).toLocaleDateString()}
+        </Typography>
+
+        {/* Seats Info */}
+        <Typography
+          sx={{
+            color: colors.text_secondary || "#64748b",
+            fontSize: "13px",
+            mb: 1,
+          }}
+        >
+          <strong>Seats:</strong> {seatsLeft} available of {ride.seatsAvailable}
+        </Typography>
+
+        {/* Notes if any */}
+        {ride.notes && (
+          <Typography
+            sx={{
+              color: colors.text_secondary || "#64748b",
+              fontSize: "13px",
+              mb: 1,
+              fontStyle: "italic",
+            }}
+          >
+            <strong>Note:</strong> {ride.notes}
+          </Typography>
+        )}
+
+        {/* Current Passengers */}
+        {ride.passengers?.length > 0 && (
+          <Box sx={{ mt: 2 }}>
+            <Typography
+              sx={{
+                color: colors.text_primary || "#1e293b",
+                fontSize: "14px",
+                fontWeight: 600,
+                mb: 1,
+              }}
+            >
+              Current Passengers:
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {ride.passengers.map(passenger => (
+                <Box
+                  key={passenger}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    px: 2,
+                    py: 1,
+                    backgroundColor: colors.badge_bg || "#d1fae5",
+                    borderRadius: "6px",
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      color: colors.badge_text || "#065f46",
+                      fontSize: "13px",
+                    }}
+                  >
+                    {passenger}
+                  </Typography>
+                  
+                  {/* Show leave button for joined rides */}
+                  {isJoinedRide && passenger === user?.email && (
+                    <Button
+                      onClick={() => onLeaveRide(ride.id)}
+                      sx={{
+                        minWidth: 'unset',
+                        px: 2,
+                        py: 0.5,
+                        backgroundColor: "#ef4444",
+                        color: "white",
+                        fontSize: "12px",
+                        '&:hover': {
+                          backgroundColor: "#dc2626"
+                        }
+                      }}
+                    >
+                      Leave Ride
+                    </Button>
+                  )}
+
+                  {/* Show remove option for created rides */}
+                  {!isJoinedRide && passenger !== ride.driverEmail && (
+                    <Box
+                      onClick={() => {
+                        if (window.confirm(`Remove passenger ${passenger}?`)) {
+                          onRemovePassenger(ride.id, passenger);
+                        }
+                      }}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(0,0,0,0.1)',
+                        cursor: 'pointer',
+                        color: '#666',
+                        fontSize: '14px',
+                        '&:hover': {
+                          backgroundColor: 'rgba(0,0,0,0.2)',
+                        }
+                      }}
+                    >
+                      ×
+                    </Box>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        )}
+
+        {/* Pending Requests */}
+        {hasPendingRequests && (
+          <Box sx={{ mt: 2 }}>
+            <Typography
+              sx={{
+                color: colors.text_primary || "#1e293b",
+                fontSize: "14px",
+                fontWeight: 600,
+                mb: 1,
+              }}
+            >
+              Pending Requests:
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {ride.pendingRequests.map(requester => (
+                <Box
+                  key={requester}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    px: 2,
+                    py: 1,
+                    backgroundColor: "#fef3c7",
+                    borderRadius: "6px",
+                  }}
+                >
+                  <Typography sx={{ flex: 1, fontSize: "13px", color: "#92400e" }}>
+                    {requester}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      onClick={() => onApprove(ride.id, requester)}
+                      size="small"
+                      sx={{
+                        minWidth: 'unset',
+                        px: 2,
+                        py: 0.5,
+                        backgroundColor: "#059669",
+                        color: "white",
+                        '&:hover': {
+                          backgroundColor: "#047857"
+                        }
+                      }}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      onClick={() => onReject(ride.id, requester)}
+                      size="small"
+                      sx={{
+                        minWidth: 'unset',
+                        px: 2,
+                        py: 0.5,
+                        backgroundColor: "#dc2626",
+                        color: "white",
+                        '&:hover': {
+                          backgroundColor: "#b91c1c"
+                        }
+                      }}
+                    >
+                      Reject
+                    </Button>
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        )}
+      </Box>
+
       {label && (
         <Box
           sx={{
             display: "inline-block",
-            mt: "6px",
+            mt: 2,
             px: "10px",
             py: "4px",
             fontSize: "11px",

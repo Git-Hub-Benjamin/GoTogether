@@ -1,11 +1,13 @@
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import authRouter from "./routes/auth.js";
 import ridesRouter from "./routes/rides.js";
 import schoolsRouter from "./routes/schools.js";
+import debugRouter from "./routes/debug.js";
 
-dotenv.config();
+import { PORT } from "./utils/emailService.js"
+import { NODE_ENV } from "./utils/emailService.js";
+console.log(`NODE_ENV: ${NODE_ENV}`);
 
 const app = express();
 
@@ -20,8 +22,14 @@ app.use("/api/auth", authRouter);
 app.use("/api/rides", ridesRouter);
 app.use("/api/schools", schoolsRouter);
 
-const PORT = process.env.PORT || 5000;
+// Debug routes - Only available in development
+if (NODE_ENV !== "production") {
+  app.use("/debug", debugRouter);
+}
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(` ----- Server running on http://localhost:${PORT} ----- `);
 });
+
+export const NODEMAIL_USER = process.env.EMAIL_USER;
+export const NODEMAIL_PASS = process.env.EMAIL_PASS;

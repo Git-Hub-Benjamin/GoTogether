@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Button, Typography, Divider } from "@mui/material";
 import { useAuth } from "../../context/AuthContext.jsx";
 import universityColors from "../../assets/university_colors.json";
+import { calculateEstimatedGasCost } from "../../utils/calculateGasCost.js";
 
 const RideCard = ({
   ride,
@@ -131,6 +132,14 @@ const RideCard = ({
           }}
         >
           <strong>Distance:</strong> {ride.distance} mi
+        </Typography>
+        <Typography
+          sx={{
+            fontSize: "0.9rem",
+            color: colors.text_secondary || "#475569",
+          }}
+        >
+          <strong>Est. Gas:</strong> ~${calculateEstimatedGasCost(ride.distance, ride.passengers.length)}/person
         </Typography>
       </Box>
 
