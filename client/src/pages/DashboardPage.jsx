@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { Box, Container } from "@mui/material";
 import { useAuth } from "../context/AuthContext.jsx";
 import CreateRideModal from "../components/CreateRideModal.jsx";
@@ -6,8 +6,9 @@ import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import FindRidesSection from "../components/dashboard/FindRidesSection.jsx";
 import MyRidesSection from "../components/dashboard/MyRidesSection.jsx";
 import universityColors from "../assets/university_colors.json";
+import { ENDPOINTS } from "../utils/api.js";
 
-const API_URL = "http://localhost:5000/api/rides";
+const API_URL = ENDPOINTS.RIDES;
 
 const DashboardPage = () => {
   const { user, token, logout } = useAuth();
@@ -17,8 +18,12 @@ const DashboardPage = () => {
   const [myJoinedRides, setMyJoinedRides] = useState([]);
   const [myRequestedRides, setMyRequestedRides] = useState([]);
   const [alert, setAlert] = useState(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [loadingRideIds, setLoadingRideIds] = useState({}); // Track per ride ID
   const [showMyRides, setShowMyRides] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  
+  // Debounce timer ref for tab switching
+  const tabToggleTimeoutRef = useRef(null);
 
   const headers = useMemo(
     () => ({
@@ -74,6 +79,7 @@ const DashboardPage = () => {
   }, [headers, user?.email, user?.school]);
 
   const joinRide = async (id) => {
+    setLoadingRideIds(prev => ({ ...prev, [id]: true }));
     try {
       const response = await fetch(`${API_URL}/${id}/request`, { 
         method: "POST", 
@@ -86,8 +92,13 @@ const DashboardPage = () => {
           type: 'error',
           message: result.error
         });
+        setLoadingRideIds(prev => ({ ...prev, [id]: false }));
         return;
       }
+      
+      // Brief delay to show user the action happened
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
       // Refresh the rides list
       const currentRides = await fetch(`${API_URL}/search`, {
         method: "POST",
@@ -102,6 +113,8 @@ const DashboardPage = () => {
         type: 'error',
         message: 'Failed to request joining the ride'
       });
+    } finally {
+      setLoadingRideIds(prev => ({ ...prev, [id]: false }));
     }
   };
 
@@ -113,39 +126,46 @@ const DashboardPage = () => {
       body: JSON.stringify({ school: user?.school }),
     }).then((res) => res.json());
     setRides(currentRides);
-    fetchMyRides();
+    await fetchMyRides();
   };
 
   const cancelRequest = async (id) => {
+    setLoadingRideIds(prev => ({ ...prev, [`cancel-${id}`]: true }));
     try {
       const response = await fetch(`${API_URL}/${id}/cancel-request`, { 
         method: "POST", 
         headers 
       });
       const result = await response.json();
-      
       if (result.error) {
+        console.error("Error cancelling request:", result.error);
         setAlert({
-          type: 'warning',
+          type: 'error',
           message: result.error
         });
+        setLoadingRideIds(prev => ({ ...prev, [`cancel-${id}`]: false }));
         return;
       }
       
-      // Refresh rides lists
+      // Brief delay to show user the action happened
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // Refresh the rides list and my rides
       const currentRides = await fetch(`${API_URL}/search`, {
         method: "POST",
         headers,
         body: JSON.stringify({ school: user?.school }),
       }).then((res) => res.json());
       setRides(currentRides);
-      await fetchMyRides();
+      await fetchMyRides(); // Refresh my rides
     } catch (err) {
-      console.error("Error canceling request:", err);
+      console.error("Error cancelling request:", err);
       setAlert({
         type: 'error',
         message: 'Failed to cancel the request'
       });
+    } finally {
+      setLoadingRideIds(prev => ({ ...prev, [`cancel-${id}`]: false }));
     }
   };
 
@@ -183,6 +203,27 @@ const DashboardPage = () => {
     }
   };
 
+  const handleTabToggle = useCallback(() => {
+    // Update UI immediately for fast switching
+    setShowMyRides(prev => !prev);
+    
+    // Debounce the fetch to prevent multiple requests
+    if (tabToggleTimeoutRef.current) {
+      clearTimeout(tabToggleTimeoutRef.current);
+    }
+    
+    // Set new timeout - only fetch after 500ms of settling
+    tabToggleTimeoutRef.current = setTimeout(() => {
+      setShowMyRides(prev => {
+        // Only fetch if we're switching TO My Rides
+        if (prev) {
+          fetchMyRides();
+        }
+        return prev;
+      });
+    }, 500);
+  }, [fetchMyRides]);
+
   const handleRideCreated = () => {
     fetchMyRides();
     setRides([]);
@@ -219,10 +260,7 @@ const DashboardPage = () => {
         schoolName={user?.school || ""}
         userEmail={user?.email}
         showMyRides={showMyRides}
-        onToggleMyRides={() => {
-          setShowMyRides(!showMyRides);
-          if (!showMyRides) fetchMyRides();
-        }}
+        onToggleMyRides={handleTabToggle}
         onLogout={logout}
       />
 
@@ -281,6 +319,8 @@ const DashboardPage = () => {
             joinRide={joinRide}
             leaveRide={leaveRide}
             onSearch={setRides}
+            loadingRideIds={loadingRideIds}
+            onCancelRequest={cancelRequest}
           />
 
           <MyRidesSection

@@ -4,9 +4,10 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SchoolSelect from "./SchoolSelect.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import { ENDPOINTS } from "../utils/api.js";
 
-const API_URL = "http://localhost:5000/api/auth";
-
+const API_URL = ENDPOINTS.AUTH;
+  
 const LoginForm = ({ disabled = false }) => {
   const { login } = useAuth();
 

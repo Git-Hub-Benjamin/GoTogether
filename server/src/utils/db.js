@@ -65,6 +65,10 @@ export const db = {
       passengers: [],
       pendingRequests: [],
       createdAt: new Date().toISOString(),
+      status: rideData.status || {
+        status: "active",
+        delete_at: null
+      }
     };
     ridesCache.push(newRide);
     return newRide;

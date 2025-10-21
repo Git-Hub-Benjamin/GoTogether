@@ -1,8 +1,9 @@
-import React from "react";
-import { Box, Button, Typography } from "@mui/material";
-import { useAuth } from "../../context/AuthContext";
+import { Box, Button, Typography, CircularProgress } from "@mui/material";
+import { useAuth } from "../../context/AuthContext.jsx";
+import { useState } from "react";
 import universityColors from "../../assets/university_colors.json";
-import { calculateEstimatedGasCost } from "../../utils/calculateGasCost.js";
+import { calculateEstimatedGasCost } from '../../utils/calculateGasCost.js';
+import { ENDPOINTS } from "../../utils/api.js";
 
 const MyRidesSection = ({ 
   active, 
@@ -15,7 +16,10 @@ const MyRidesSection = ({
 }) => {
   const { user, token } = useAuth();
   const empty = myCreatedRides.length === 0 && myJoinedRides.length === 0 && myRequestedRides.length === 0;
-  const API_URL = "http://localhost:5000/api/rides";
+  const API_URL = ENDPOINTS.RIDES;
+  
+  // Loading states for different actions
+  const [loadingActions, setLoadingActions] = useState({});
 
   const colors =
     universityColors.find(
@@ -23,6 +27,8 @@ const MyRidesSection = ({
     )?.colors || {};
 
   const handleApprove = async (rideId, requesterEmail) => {
+    const actionKey = `approve-${rideId}-${requesterEmail}`;
+    setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
     try {
       const response = await fetch(`${API_URL}/${rideId}/approve/${requesterEmail}`, {
         method: 'POST',
@@ -33,13 +39,21 @@ const MyRidesSection = ({
       });
 
       if (!response.ok) throw new Error('Failed to approve request');
+      
+      // Brief delay to show user the action happened
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
       onFetchRides(); // Refresh rides after approval
     } catch (error) {
       console.error('Error approving request:', error);
+    } finally {
+      setLoadingActions(prev => ({ ...prev, [actionKey]: false }));
     }
   };
 
   const handleReject = async (rideId, requesterEmail) => {
+    const actionKey = `reject-${rideId}-${requesterEmail}`;
+    setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
     try {
       const response = await fetch(`${API_URL}/${rideId}/reject/${requesterEmail}`, {
         method: 'POST',
@@ -50,13 +64,21 @@ const MyRidesSection = ({
       });
 
       if (!response.ok) throw new Error('Failed to reject request');
+      
+      // Brief delay to show user the action happened
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
       onFetchRides(); // Refresh rides after rejection
     } catch (error) {
       console.error('Error rejecting request:', error);
+    } finally {
+      setLoadingActions(prev => ({ ...prev, [actionKey]: false }));
     }
   };
 
   const handleRemovePassenger = async (rideId, passengerEmail) => {
+    const actionKey = `remove-${rideId}-${passengerEmail}`;
+    setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
     try {
       const response = await fetch(`${API_URL}/${rideId}/remove/${passengerEmail}`, {
         method: 'POST',
@@ -67,13 +89,21 @@ const MyRidesSection = ({
       });
 
       if (!response.ok) throw new Error('Failed to remove passenger');
+      
+      // Brief delay to show user the action happened
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
       onFetchRides(); // Refresh rides after passenger removal
     } catch (error) {
       console.error('Error removing passenger:', error);
+    } finally {
+      setLoadingActions(prev => ({ ...prev, [actionKey]: false }));
     }
   };
 
   const handleLeaveRide = async (rideId) => {
+    const actionKey = `leave-${rideId}`;
+    setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
     try {
       const response = await fetch(`${API_URL}/${rideId}/leave`, {
         method: 'POST',
@@ -84,9 +114,112 @@ const MyRidesSection = ({
       });
 
       if (!response.ok) throw new Error('Failed to leave ride');
+      
+      // Brief delay to show user the action happened
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
       onFetchRides(); // Refresh rides after leaving
     } catch (error) {
       console.error('Error leaving ride:', error);
+    } finally {
+      setLoadingActions(prev => ({ ...prev, [actionKey]: false }));
+    }
+  };
+
+  const handleCompleteRide = async (rideId) => {
+    const actionKey = `complete-${rideId}`;
+    setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
+    try {
+      const response = await fetch(`${API_URL}/${rideId}/complete`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to mark ride as complete');
+      
+      // Brief delay to show user the action happened
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      onFetchRides(); // Refresh rides after completing
+    } catch (error) {
+      console.error('Error marking ride as complete:', error);
+    } finally {
+      setLoadingActions(prev => ({ ...prev, [actionKey]: false }));
+    }
+  };
+
+  const handleUnmarkComplete = async (rideId) => {
+    const actionKey = `unmark-${rideId}`;
+    setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
+    try {
+      const response = await fetch(`${API_URL}/${rideId}/unmark-complete`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to unmark ride');
+      }
+      
+      // Brief delay to show user the action happened
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      onFetchRides(); // Refresh rides after unmarking
+    } catch (error) {
+      console.error('Error unmarking ride:', error);
+      alert(error.message || 'Error unmarking ride');
+    } finally {
+      setLoadingActions(prev => ({ ...prev, [actionKey]: false }));
+    }
+  };
+
+  const handleDeleteRide = async (rideId) => {
+    if (!window.confirm('Are you sure you want to delete this ride? All passengers and pending requests will be notified.')) {
+      return;
+    }
+    const actionKey = `delete-${rideId}`;
+    setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
+    try {
+      const response = await fetch(`${API_URL}/${rideId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to delete ride');
+      
+      // Brief delay to show user the action happened
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      onFetchRides(); // Refresh rides after deletion
+    } catch (error) {
+      console.error('Error deleting ride:', error);
+    } finally {
+      setLoadingActions(prev => ({ ...prev, [actionKey]: false }));
+    }
+  };
+
+  const handleCancelRequest = async (rideId) => {
+    const actionKey = `cancel-request-${rideId}`;
+    setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
+    try {
+      // Brief delay to show user the action happened
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      onCancelRequest(rideId);
+    } catch (error) {
+      console.error('Error cancelling request:', error);
+    } finally {
+      setLoadingActions(prev => ({ ...prev, [actionKey]: false }));
     }
   };
 
@@ -172,6 +305,10 @@ const MyRidesSection = ({
                     onApprove={handleApprove}
                     onReject={handleReject}
                     onRemovePassenger={handleRemovePassenger}
+                    onComplete={handleCompleteRide}
+                    onUnmarkComplete={handleUnmarkComplete}
+                    onDelete={handleDeleteRide}
+                    loadingActions={loadingActions}
                     isJoinedRide={false}
                     user={user}
                   />
@@ -227,20 +364,36 @@ const MyRidesSection = ({
                       📅 {ride.departureDate} • 🕓 {ride.departureTime}
                     </Typography>
                     <Button
-                      onClick={() => onCancelRequest(ride.id)}
+                      onClick={() => handleCancelRequest(ride.id)}
+                      disabled={loadingActions?.[`cancel-request-${ride.id}`] === true}
                       sx={{
                         mt: 1,
                         color: "#ef4444",
                         borderColor: "#ef4444",
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.5,
                         '&:hover': {
                           borderColor: "#dc2626",
                           backgroundColor: "rgba(239, 68, 68, 0.04)"
+                        },
+                        '&:disabled': {
+                          color: '#94a3b8',
+                          borderColor: '#cbd5e1',
+                          backgroundColor: 'rgba(148, 163, 184, 0.1)'
                         }
                       }}
                       variant="outlined"
                       size="small"
                     >
-                      Cancel Request
+                      {loadingActions?.[`cancel-request-${ride.id}`] ? (
+                        <>
+                          <CircularProgress size={14} sx={{ color: '#ef4444' }} />
+                          Cancelling...
+                        </>
+                      ) : (
+                        'Cancel Request'
+                      )}
                     </Button>
                   </Box>
                 ))}
@@ -268,6 +421,7 @@ const MyRidesSection = ({
                     colors={colors}
                     index={index + myCreatedRides.length}
                     onLeaveRide={handleLeaveRide}
+                    loadingActions={loadingActions}
                     isJoinedRide={true}
                     user={user}
                   />
@@ -315,10 +469,30 @@ const MyRidesSection = ({
 };
 
 // In RideCardCompact component
-const RideCardCompact = ({ ride, colors, label, onDelete, onApprove, onReject, onRemovePassenger, onLeaveRide, isJoinedRide }) => {
+const RideCardCompact = ({ ride, colors, label, onDelete, onComplete, onUnmarkComplete, onApprove, onReject, onRemovePassenger, onLeaveRide, loadingActions, isJoinedRide }) => {
   const seatsLeft = parseInt(ride.seatsAvailable) - (ride.passengers?.length || 0);
   const hasPendingRequests = ride.pendingRequests?.length > 0;
   const { user } = useAuth();
+  const isCompleted = ride.status?.status === "completed";
+  const isDeleted = ride.status?.status === "delete";
+
+  // Check if unmark button should be shown
+  const canUnmark = () => {
+    if (!isCompleted) return false;
+    
+    const departureDateTime = new Date(`${ride.departureDate}T${ride.departureTime}`);
+    const now = new Date();
+    const timeSinceDeparture = now - departureDateTime;
+    const oneHourMs = 60 * 60 * 1000;
+    
+    // Show button if departure hasn't happened yet OR was within the last hour
+    return timeSinceDeparture <= oneHourMs;
+  };
+
+  // Helper to check if an action is loading
+  const isActionLoading = (actionKey) => {
+    return loadingActions?.[actionKey] === true;
+  };
 
   return (
     <Box
@@ -329,6 +503,7 @@ const RideCardCompact = ({ ride, colors, label, onDelete, onApprove, onReject, o
         padding: "16px",
         boxShadow: `0 2px 8px ${colors.card_shadow || "rgba(0,0,0,0.06)"}`,
         animation: "fadeInUp 0.3s ease forwards",
+        opacity: isCompleted ? 0.7 : isDeleted ? 0.5 : 1,
       }}
     >
       {/* Header with Route and Actions */}
@@ -352,24 +527,144 @@ const RideCardCompact = ({ ride, colors, label, onDelete, onApprove, onReject, o
           >
             {ride.departureDate} at {ride.departureTime}
           </Typography>
+          {isCompleted && (
+            <Typography
+              sx={{
+                color: "#059669",
+                fontSize: "12px",
+                fontWeight: 600,
+                mt: 0.5,
+              }}
+            >
+              ✓ Completed
+            </Typography>
+          )}
+          {isDeleted && (
+            <Typography
+              sx={{
+                color: "#dc2626",
+                fontSize: "12px",
+                fontWeight: 600,
+                mt: 0.5,
+              }}
+            >
+              🗑️ Marked for Deletion
+            </Typography>
+          )}
         </Box>
         
-        {onDelete && (
-          <Button
-            onClick={() => onDelete(ride.id)}
-            color="error"
-            size="small"
-            sx={{
-              minWidth: 'unset',
-              p: '6px',
-              color: '#ef4444',
-              '&:hover': {
-                backgroundColor: 'rgba(239, 68, 68, 0.04)'
-              }
-            }}
-          >
-            Delete
-          </Button>
+        {/* Action Buttons - Only show for created rides */}
+        {!isJoinedRide && !isDeleted && (
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {!isCompleted && onComplete && (
+              <Button
+                onClick={() => onComplete(ride.id)}
+                disabled={isActionLoading(`complete-${ride.id}`)}
+                color="primary"
+                size="small"
+                sx={{
+                  minWidth: 'unset',
+                  px: 2,
+                  py: '6px',
+                  color: '#2563eb',
+                  border: '1px solid #2563eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  '&:hover': {
+                    backgroundColor: 'rgba(37, 99, 235, 0.04)'
+                  },
+                  '&:disabled': {
+                    color: '#94a3b8',
+                    borderColor: '#cbd5e1',
+                    backgroundColor: 'rgba(148, 163, 184, 0.1)'
+                  }
+                }}
+                variant="outlined"
+              >
+                {isActionLoading(`complete-${ride.id}`) ? (
+                  <>
+                    <CircularProgress size={16} sx={{ color: '#2563eb' }} />
+                    Processing...
+                  </>
+                ) : (
+                  'Mark as Complete'
+                )}
+              </Button>
+            )}
+            {isCompleted && canUnmark() && onUnmarkComplete && (
+              <Button
+                onClick={() => onUnmarkComplete(ride.id)}
+                disabled={isActionLoading(`unmark-${ride.id}`)}
+                color="secondary"
+                size="small"
+                sx={{
+                  minWidth: 'unset',
+                  px: 2,
+                  py: '6px',
+                  color: '#9333ea',
+                  border: '1px solid #9333ea',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  '&:hover': {
+                    backgroundColor: 'rgba(147, 51, 234, 0.04)'
+                  },
+                  '&:disabled': {
+                    color: '#94a3b8',
+                    borderColor: '#cbd5e1',
+                    backgroundColor: 'rgba(148, 163, 184, 0.1)'
+                  }
+                }}
+                variant="outlined"
+              >
+                {isActionLoading(`unmark-${ride.id}`) ? (
+                  <>
+                    <CircularProgress size={16} sx={{ color: '#9333ea' }} />
+                    Processing...
+                  </>
+                ) : (
+                  'Unmark Complete'
+                )}
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                onClick={() => onDelete(ride.id)}
+                disabled={isActionLoading(`delete-${ride.id}`)}
+                color="error"
+                size="small"
+                sx={{
+                  minWidth: 'unset',
+                  px: 2,
+                  py: '6px',
+                  color: '#ef4444',
+                  border: '1px solid #ef4444',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  '&:hover': {
+                    backgroundColor: 'rgba(239, 68, 68, 0.04)'
+                  },
+                  '&:disabled': {
+                    color: '#94a3b8',
+                    borderColor: '#cbd5e1',
+                    backgroundColor: 'rgba(148, 163, 184, 0.1)'
+                  }
+                }}
+                variant="outlined"
+              >
+                {isActionLoading(`delete-${ride.id}`) ? (
+                  <>
+                    <CircularProgress size={16} sx={{ color: '#ef4444' }} />
+                    Processing...
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </Button>
+            )}
+          </Box>
         )}
       </Box>
 
@@ -460,6 +755,7 @@ const RideCardCompact = ({ ride, colors, label, onDelete, onApprove, onReject, o
                   {isJoinedRide && passenger === user?.email && (
                     <Button
                       onClick={() => onLeaveRide(ride.id)}
+                      disabled={isActionLoading(`leave-${ride.id}`)}
                       sx={{
                         minWidth: 'unset',
                         px: 2,
@@ -467,12 +763,27 @@ const RideCardCompact = ({ ride, colors, label, onDelete, onApprove, onReject, o
                         backgroundColor: "#ef4444",
                         color: "white",
                         fontSize: "12px",
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.5,
                         '&:hover': {
                           backgroundColor: "#dc2626"
+                        },
+                        '&:disabled': {
+                          backgroundColor: '#94a3b8',
+                          color: 'white',
+                          opacity: 0.6
                         }
                       }}
                     >
-                      Leave Ride
+                      {isActionLoading(`leave-${ride.id}`) ? (
+                        <>
+                          <CircularProgress size={12} sx={{ color: 'white' }} />
+                          Leaving...
+                        </>
+                      ) : (
+                        'Leave Ride'
+                      )}
                     </Button>
                   )}
 
@@ -480,7 +791,7 @@ const RideCardCompact = ({ ride, colors, label, onDelete, onApprove, onReject, o
                   {!isJoinedRide && passenger !== ride.driverEmail && (
                     <Box
                       onClick={() => {
-                        if (window.confirm(`Remove passenger ${passenger}?`)) {
+                        if (!isActionLoading(`remove-${ride.id}-${passenger}`) && window.confirm(`Remove passenger ${passenger}?`)) {
                           onRemovePassenger(ride.id, passenger);
                         }
                       }}
@@ -491,16 +802,21 @@ const RideCardCompact = ({ ride, colors, label, onDelete, onApprove, onReject, o
                         width: '24px',
                         height: '24px',
                         borderRadius: '50%',
-                        backgroundColor: 'rgba(0,0,0,0.1)',
-                        cursor: 'pointer',
+                        backgroundColor: isActionLoading(`remove-${ride.id}-${passenger}`) ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.1)',
+                        cursor: isActionLoading(`remove-${ride.id}-${passenger}`) ? 'not-allowed' : 'pointer',
                         color: '#666',
                         fontSize: '14px',
+                        position: 'relative',
                         '&:hover': {
                           backgroundColor: 'rgba(0,0,0,0.2)',
                         }
                       }}
                     >
-                      ×
+                      {isActionLoading(`remove-${ride.id}-${passenger}`) ? (
+                        <CircularProgress size={16} sx={{ color: '#666' }} />
+                      ) : (
+                        '×'
+                      )}
                     </Box>
                   )}
                 </Box>
@@ -542,6 +858,7 @@ const RideCardCompact = ({ ride, colors, label, onDelete, onApprove, onReject, o
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <Button
                       onClick={() => onApprove(ride.id, requester)}
+                      disabled={isActionLoading(`approve-${ride.id}-${requester}`)}
                       size="small"
                       sx={{
                         minWidth: 'unset',
@@ -549,15 +866,31 @@ const RideCardCompact = ({ ride, colors, label, onDelete, onApprove, onReject, o
                         py: 0.5,
                         backgroundColor: "#059669",
                         color: "white",
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.5,
                         '&:hover': {
                           backgroundColor: "#047857"
+                        },
+                        '&:disabled': {
+                          backgroundColor: '#94a3b8',
+                          color: 'white',
+                          opacity: 0.6
                         }
                       }}
                     >
-                      Approve
+                      {isActionLoading(`approve-${ride.id}-${requester}`) ? (
+                        <>
+                          <CircularProgress size={12} sx={{ color: 'white' }} />
+                          Approving...
+                        </>
+                      ) : (
+                        'Approve'
+                      )}
                     </Button>
                     <Button
                       onClick={() => onReject(ride.id, requester)}
+                      disabled={isActionLoading(`reject-${ride.id}-${requester}`)}
                       size="small"
                       sx={{
                         minWidth: 'unset',
@@ -565,12 +898,27 @@ const RideCardCompact = ({ ride, colors, label, onDelete, onApprove, onReject, o
                         py: 0.5,
                         backgroundColor: "#dc2626",
                         color: "white",
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.5,
                         '&:hover': {
                           backgroundColor: "#b91c1c"
+                        },
+                        '&:disabled': {
+                          backgroundColor: '#94a3b8',
+                          color: 'white',
+                          opacity: 0.6
                         }
                       }}
                     >
-                      Reject
+                      {isActionLoading(`reject-${ride.id}-${requester}`) ? (
+                        <>
+                          <CircularProgress size={12} sx={{ color: 'white' }} />
+                          Rejecting...
+                        </>
+                      ) : (
+                        'Reject'
+                      )}
                     </Button>
                   </Box>
                 </Box>

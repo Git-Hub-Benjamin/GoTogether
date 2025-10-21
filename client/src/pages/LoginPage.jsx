@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Container, Typography, Box, CircularProgress } from "@mui/material";
 import LoginForm from "../components/LoginForm.jsx";
+import { ENDPOINTS } from "../utils/api.js";
 
-const SERVER_URL = "http://localhost:5000/";
+const SERVER_URL = ENDPOINTS.SERVER;
 
 const LoginPage = () => {
   const [serverOnline, setServerOnline] = useState(null);

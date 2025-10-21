@@ -1,0 +1,7 @@
+export const API_BASE = "http://localhost:5000/api";
+
+export const ENDPOINTS = {
+  RIDES: `${API_BASE}/rides`,
+  AUTH: `${API_BASE}/auth`,
+  SCHOOLS: `${API_BASE}/schools`,
+};

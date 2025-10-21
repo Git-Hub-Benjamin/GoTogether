@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Button, Typography, Divider } from "@mui/material";
+import { Box, Button, Typography, Divider, CircularProgress } from "@mui/material";
 import { useAuth } from "../../context/AuthContext.jsx";
 import universityColors from "../../assets/university_colors.json";
 import { calculateEstimatedGasCost } from "../../utils/calculateGasCost.js";
@@ -12,6 +12,8 @@ const RideCard = ({
   approveRequest,
   rejectRequest,
   index = 0,
+  loadingRideIds,
+  onCancelRequest,
 }) => {
   const { user } = useAuth();
   const schoolName = user?.school || "";
@@ -179,35 +181,62 @@ const RideCard = ({
             </Button>
           ) : isPending ? (
             <Button
-              onClick={() => leaveRide(ride.id)}
+              onClick={() => onCancelRequest(ride.id)}
               variant="outlined"
               color="error"
               size="small"
+              disabled={loadingRideIds?.[`cancel-${ride.id}`] || false}
               sx={{
                 borderColor: "#ef4444",
                 color: "#ef4444",
+                minWidth: "unset",
+                px: 2,
+                py: 0.75,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
                 "&:hover": {
                   borderColor: "#dc2626",
                   backgroundColor: "rgba(239, 68, 68, 0.04)",
                 },
               }}
             >
-              Cancel Request
+              {loadingRideIds?.[`cancel-${ride.id}`] ? (
+                <>
+                  <CircularProgress size={16} sx={{ color: '#ef4444' }} />
+                  Cancelling...
+                </>
+              ) : (
+                "Cancel Request"
+              )}
             </Button>
           ) : (
             <Button
               onClick={() => joinRide(ride.id)}
               variant="contained"
               size="small"
+              disabled={remainingSeats === 0 || loadingRideIds?.[ride.id] || false}
               sx={{
                 bgcolor: colors.primary || "#2563eb",
+                minWidth: "unset",
+                px: 2,
+                py: 0.75,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
                 "&:hover": {
                   bgcolor: colors.primary_dark || "#1d4ed8",
                 },
               }}
-              disabled={remainingSeats === 0}
             >
-              Request to Join
+              {loadingRideIds?.[ride.id] ? (
+                <>
+                  <CircularProgress size={16} sx={{ color: 'white' }} />
+                  Requesting...
+                </>
+              ) : (
+                "Request to Join"
+              )}
             </Button>
           )}
         </Box>

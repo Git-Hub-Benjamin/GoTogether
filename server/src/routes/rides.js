@@ -12,6 +12,7 @@ import { logDebug } from "../utils/logger.js";
 import { sendRequestEmail } from "../utils/emailService.js";
 import { checkRideCooldown, checkRequestLimit, setCooldown } from "../middleware/rideCooldown.js";
 import { searchLimiter, locationsLimiter, rideLimiter } from "../middleware/rateLimiter.js";
+import { markRideAsCompleted, unmarkRideAsCompleted } from "../utils/rideStatusManager.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UNIVERSITIES_PATH = path.join(__dirname, "../data/us_universities.json");
@@ -108,6 +109,8 @@ router.post("/search", authenticateToken, searchLimiter, async (req, res) => {
     rides = rides.filter((ride) => {
       // Exclude rides created by the requesting user
       if (ride.driverEmail === req.user?.email) return false;
+      // Exclude rides marked for deletion
+      if (ride.status?.status === "delete") return false;
       if (from && from !== ride.from) return false;
       if (to && to !== ride.destination) return false;
       if (date && date !== ride.departureDate) return false;
@@ -116,6 +119,8 @@ router.post("/search", authenticateToken, searchLimiter, async (req, res) => {
     });
 
     rides.sort((a, b) => new Date(a.departureDate) - new Date(b.departureDate));
+
+    logDebug("POST /search - Found: " + rides.length + " rides");
 
     res.json(rides);
   } catch (err) {
@@ -254,6 +259,10 @@ router.post("/", authenticateToken, rideLimiter, (req, res) => {
       seatsAvailable,
       notes: notes || "",
       distance,
+      status: {
+        status: "active",
+        status_at: null
+      }
     });
 
     logDebug("POST /rides - Success", {
@@ -340,11 +349,10 @@ router.post("/:id/remove/:email", authenticateToken, rideLimiter, (req, res) => 
   try {
     const { id, email: passengerEmail } = req.params;
     const driverEmail = req.user?.email;
-
     logDebug("POST /rides/:id/remove/:email", {
       rideId: id,
       driverEmail,
-      passengerEmail,
+      passengerEmail, 
       action: "remove_passenger"
     });
 
@@ -522,6 +530,85 @@ router.post("/:id/cancel-request", authenticateToken, rideLimiter, (req, res) =>
   } catch (err) {
     console.error("Error cancelling join request:", err);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Mark ride as completed (driver only)
+router.post("/:id/complete", authenticateToken, rideLimiter, (req, res) => {
+  try {
+    const { id } = req.params;
+    const driverEmail = req.user?.email;
+
+    logDebug("POST /rides/:id/complete", {
+      rideId: id,
+      driverEmail,
+      action: "mark_as_complete"
+    });
+
+    const ride = db.findRideById(id);
+    if (!ride) {
+      return res.status(404).json({ message: "Ride not found" });
+    }
+
+    if (ride.driverEmail !== driverEmail) {
+      return res.status(403).json({ message: "Only the driver can complete a ride" });
+    }
+
+    const result = markRideAsCompleted(id);
+    if (result.error) {
+      return res.status(400).json({ message: result.error });
+    }
+
+    logDebug("Ride marked as completed successfully", {
+      rideId: id,
+      driverEmail,
+      status_at: result.status.status_at
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error("Error completing ride:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Unmark ride as completed (driver only)
+router.post("/:id/unmark-complete", authenticateToken, rideLimiter, (req, res) => {
+  try {
+    const { id } = req.params;
+    const driverEmail = req.user?.email;
+
+    logDebug("POST /rides/:id/unmark-complete", {
+      rideId: id,
+      driverEmail,
+      action: "unmark_as_complete"
+    });
+
+    const ride = db.findRideById(id);
+    if (!ride) {
+      return res.status(404).json({ message: "Ride not found" });
+    }
+
+    if (ride.driverEmail !== driverEmail) {
+      return res.status(403).json({ message: "Only the driver can unmark a ride" });
+    }
+
+    const result = unmarkRideAsCompleted(id);
+    if (result.error) {
+      return res.status(400).json({ message: result.error });
+    }
+
+    logDebug("Ride unmarked as completed successfully", {
+      rideId: id,
+      driverEmail,
+      departureDate: ride.departureDate,
+      departureTime: ride.departureTime
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error("Error unmarking ride:", err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 

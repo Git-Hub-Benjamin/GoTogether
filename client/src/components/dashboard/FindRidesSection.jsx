@@ -14,6 +14,8 @@ const FindRidesSection = ({
   joinRide,
   leaveRide,
   onSearch,
+  loadingRideIds,
+  onCancelRequest,
 }) => {
   const { user, token } = useAuth();
   const schoolName = user?.school || "";
@@ -73,6 +75,8 @@ const FindRidesSection = ({
           joinRide={joinRide}
           leaveRide={leaveRide}
           filterHeight={filterHeight}
+          loadingRideIds={loadingRideIds}
+          onCancelRequest={onCancelRequest}
         />
       </Box>
     </Box>

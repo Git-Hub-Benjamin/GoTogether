@@ -12,8 +12,9 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import { useAuth } from "../context/AuthContext.jsx";
 import usCities from "../assets/us_cities.json";
+import { ENDPOINTS } from "../utils/api.js";
 
-const API_URL = "http://localhost:5000/api/rides";
+const API_URL = ENDPOINTS.RIDES;
 
 const CreateRideModal = ({ open, onClose, onRideCreated, school, state }) => {
   const { token } = useAuth();

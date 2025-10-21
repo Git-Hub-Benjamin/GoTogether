@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Autocomplete, TextField, Box, CircularProgress } from "@mui/material";
+import { ENDPOINTS } from "../utils/api.js";
 
-const API_URL = "http://localhost:5000/api/schools";
+const API_URL = ENDPOINTS.SCHOOLS;
 
 const HARD_CODED_STATES = [
   "Alabama",

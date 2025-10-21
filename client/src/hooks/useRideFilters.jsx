@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import usCities from "../assets/us_cities.json";
+import { ENDPOINTS } from "../utils/api.js";
 
-const API_URL = "http://localhost:5000/api/rides";
+const API_URL = ENDPOINTS.RIDES;
 
 export const useRideFilters = (schoolName, state, token, onSearch) => {
   const [fromFilter, setFromFilter] = useState("");

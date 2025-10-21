@@ -1,6 +1,5 @@
 import { Box, Typography } from "@mui/material";
 import RideCard from "../rides/RideCard";
-import { useRef, useEffect, useState } from "react";
 
 const ResultsSection = ({
   colors,
@@ -9,6 +8,8 @@ const ResultsSection = ({
   joinRide,
   leaveRide,
   filterHeight,
+  loadingRideIds,
+  onCancelRequest,
 }) => {
   return (
     <Box
@@ -104,6 +105,8 @@ const ResultsSection = ({
                 joinRide={joinRide}
                 leaveRide={leaveRide}
                 index={index}
+                loadingRideIds={loadingRideIds}
+                onCancelRequest={onCancelRequest}
               />
             ))}
           </Box>
