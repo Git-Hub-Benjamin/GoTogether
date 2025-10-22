@@ -21,9 +21,20 @@ const DashboardPage = () => {
   const [loadingRideIds, setLoadingRideIds] = useState({}); // Track per ride ID
   const [showMyRides, setShowMyRides] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false); // Loading state for search button
   
-  // Debounce timer ref for tab switching
+  // Current filters state for refreshing search
+  const [currentFilters, setCurrentFilters] = useState({
+    from: "",
+    to: "",
+    radius: 100,
+    date: "",
+  });
+  
+  // Debounce timer refs
   const tabToggleTimeoutRef = useRef(null);
+  const searchTriggerRef = useRef(null); // Ref to trigger search programmatically
+  const initialSearchDone = useRef(false); // Track if initial search has run
 
   const headers = useMemo(
     () => ({
@@ -207,7 +218,7 @@ const DashboardPage = () => {
     // Update UI immediately for fast switching
     setShowMyRides(prev => !prev);
     
-    // Debounce the fetch to prevent multiple requests
+    // Clear existing timeout
     if (tabToggleTimeoutRef.current) {
       clearTimeout(tabToggleTimeoutRef.current);
     }
@@ -215,14 +226,74 @@ const DashboardPage = () => {
     // Set new timeout - only fetch after 500ms of settling
     tabToggleTimeoutRef.current = setTimeout(() => {
       setShowMyRides(prev => {
-        // Only fetch if we're switching TO My Rides
-        if (prev) {
+        // When switching TO Find Rides, trigger search programmatically
+        if (!prev) {
+          // Trigger search button click after a tiny delay to ensure state is set
+          setTimeout(() => {
+            if (searchTriggerRef.current) {
+              searchTriggerRef.current();
+            }
+          }, 50);
+        } else {
+          // When switching TO My Rides, fetch my rides
           fetchMyRides();
         }
         return prev;
       });
     }, 500);
   }, [fetchMyRides]);
+
+  // Unified search function that will be triggered by search button or programmatically
+  const performSearch = useCallback(async () => {
+    setSearchLoading(true);
+    try {
+      // Clean up campus suffix from filter (client-side only)
+      const cleanedFilters = {
+        from: currentFilters.from.includes(" (Campus)")
+          ? currentFilters.from.replace(" (Campus)", "").trim()
+          : currentFilters.from,
+        to: currentFilters.to.includes(" (Campus)")
+          ? currentFilters.to.replace(" (Campus)", "").trim()
+          : currentFilters.to,
+        radius: currentFilters.radius,
+        date: currentFilters.date,
+      };
+
+      const res = await fetch(`${API_URL}/search`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          from: cleanedFilters.from,
+          to: cleanedFilters.to,
+          radius: cleanedFilters.radius,
+          school: user?.school,
+          date: cleanedFilters.date,
+        }),
+      });
+      const data = await res.json();
+      setRides(Array.isArray(data) ? data : []);
+      
+      // Add delay for UX feedback
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (err) {
+      console.error("Error searching rides:", err);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [currentFilters, headers, user?.school]);
+
+  // Set ref so search can be triggered programmatically
+  useEffect(() => {
+    searchTriggerRef.current = performSearch;
+  }, [performSearch]);
+
+  // Initial search on page load (only once)
+  useEffect(() => {
+    if (user?.school && !showMyRides && !initialSearchDone.current) {
+      initialSearchDone.current = true;
+      performSearch();
+    }
+  }, [user?.school, showMyRides, performSearch]);
 
   const handleRideCreated = () => {
     fetchMyRides();
@@ -321,6 +392,9 @@ const DashboardPage = () => {
             onSearch={setRides}
             loadingRideIds={loadingRideIds}
             onCancelRequest={cancelRequest}
+            onFiltersChange={setCurrentFilters}
+            searchLoading={searchLoading}
+            onPerformSearch={performSearch}
           />
 
           <MyRidesSection

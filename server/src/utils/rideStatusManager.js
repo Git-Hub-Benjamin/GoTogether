@@ -1,4 +1,4 @@
-import { db } from "./db.js";
+import { db } from "./ridesDb.js";
 import { logDebug } from "./logger.js";
 
 // checks every 5 minutes

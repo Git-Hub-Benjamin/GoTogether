@@ -231,7 +231,7 @@ async function clearLimiters() {
 async function showMenu() {
   console.clear();
   console.log(`
-${colors.bright}🚗 Go-Together Debug Menu${colors.reset}
+${colors.bright}Go-Together Debug Menu${colors.reset}
 
 ${colors.cyan}Debug Token:${colors.reset} ${
     authToken

@@ -4,6 +4,7 @@ import {
   TextField,
   Typography,
   Autocomplete,
+  CircularProgress,
 } from "@mui/material";
 import { forwardRef } from "react";
 
@@ -26,6 +27,7 @@ const FilterSection = forwardRef(
       clearFilters,
       handleSearch,
       onCreateRide,
+      searchLoading,
     },
     ref
   ) => {
@@ -227,6 +229,7 @@ const FilterSection = forwardRef(
           <Button
             variant="contained"
             onClick={handleSearch}
+            disabled={searchLoading}
             size="small"
             sx={{
               flex: 1,
@@ -236,12 +239,23 @@ const FilterSection = forwardRef(
               textTransform: "none",
               fontSize: "13px",
               py: 0.8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
               "&:hover": {
                 background: colors.button_primary_hover || "#0f172a",
               },
             }}
           >
-            Search
+            {searchLoading ? (
+              <>
+                <CircularProgress size={16} sx={{ color: 'white' }} />
+                Searching...
+              </>
+            ) : (
+              "Search"
+            )}
           </Button>
         </Box>
 

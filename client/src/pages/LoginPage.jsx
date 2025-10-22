@@ -10,7 +10,9 @@ const LoginPage = () => {
 
   const checkServerStatus = async () => {
     try {
+      console.log('ServerURL:', SERVER_URL);
       const res = await fetch(SERVER_URL, { method: "GET" });
+      console.log('Server response status:', res.status, ', Sent: ', res.data);
       if (!res.ok) throw new Error("Not OK");
       setServerOnline(true);
     } catch {

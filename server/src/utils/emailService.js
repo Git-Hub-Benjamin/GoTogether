@@ -1,5 +1,4 @@
 import dotenv from "dotenv";
-import nodemailer from "nodemailer";
 import { google } from "googleapis";
 import { logDebug } from "./logger.js";
 
@@ -79,6 +78,19 @@ async function sendMail(options) {
   } catch (error) {
     console.error("❌ Email sending error:", error);
   }
+}
+
+// --- Generic Email Sender (for notifications) ---------------------------------
+
+export async function sendEmail(to, subject, htmlContent) {
+  const mailOptions = {
+    from: `"GoTogether" <${process.env.EMAIL_USER}>`,
+    to,
+    subject,
+    html: htmlContent,
+  };
+
+  await sendMail(mailOptions);
 }
 
 // --- Email Types --------------------------------------------------------------

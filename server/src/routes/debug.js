@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db } from "../utils/db.js";
+import { db } from "../utils/ridesDb.js";
 import jwt from "jsonwebtoken";
 
 const router = Router();

@@ -4,5 +4,6 @@ export const ENDPOINTS = {
   RIDES: `${API_BASE}/rides`,
   AUTH: `${API_BASE}/auth`,
   SCHOOLS: `${API_BASE}/schools`,
-  DEBUG: `${API_BASE}/debug`
+  DEBUG: `${API_BASE}/debug`,
+  SERVER: `${API_BASE.replace('/api', '')}`
 };

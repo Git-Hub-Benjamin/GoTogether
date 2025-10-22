@@ -27,6 +27,13 @@ export default function RootLayout() {
                 title: 'Dashboard'
               }}
             />
+            <Stack.Screen 
+              name="settings" 
+              options={{
+                headerShown: false,
+                title: 'Settings'
+              }}
+            />
           </Stack>
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
         </AuthProvider>

@@ -3,6 +3,7 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { verifyEmailLimiter, verifyCodeLimiter } from "../middleware/rateLimiter.js";
 import { sendVerificationEmail } from "../utils/emailService.js";
+import { storeDeviceToken, emailHasDeviceToken } from "../utils/notificationDb.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -80,7 +81,7 @@ router.post("/verify-email", verifyEmailLimiter, async (req, res) => {
   }
 });
 
-router.post("/check-code", verifyCodeLimiter, (req, res) => {
+router.post("/check-code", verifyCodeLimiter, async (req, res) => {
   console.log("Body:", req.body);
 
   const { email, code } = req.body;
@@ -120,11 +121,43 @@ router.post("/check-code", verifyCodeLimiter, (req, res) => {
     (u) => u.name.toLowerCase() === record.school.toLowerCase()
   );
 
-  res.json({
+  const response = {
     message: "Email verified successfully!",
     token,
     user: { email, school: record.school, state: uni.state },
-  });
+  };
+
+  // Handle mobile client device token registration
+  // Only request permissions if this is a new user (not in notification DB)
+  if (req.clientType === 'mobile') {
+    const hasExistingToken = await emailHasDeviceToken(email);
+    
+    if (!hasExistingToken) {
+      // New user - request permissions
+      response.requestNotifications = true;
+      console.log(`📱 New user ${email} - will request notification permissions`);
+    } else {
+      console.log(`✅ Returning user ${email} - no permission request needed`);
+    }
+    
+    // If deviceToken is provided, store it
+    if (req.body.deviceToken) {
+      try {
+        await storeDeviceToken(
+          email,
+          req.body.deviceToken,
+          req.clientPlatform // 'ios' or 'android'
+        );
+        response.notificationsEnabled = true;
+        console.log(`✅ Device token registered for ${email} (${req.clientPlatform})`);
+      } catch (error) {
+        console.error('Error registering device token:', error);
+        // Continue even if device token registration fails
+      }
+    }
+  }
+
+  res.json(response);
 });
 
 export default router;

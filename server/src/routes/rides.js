@@ -4,7 +4,7 @@ import {
   findNearbyCitiesDynamic,
   getDistanceInMiles,
 } from "../utils/findNearbyCities.js";
-import { db } from "../utils/db.js";
+import { db } from "../utils/ridesDb.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -13,6 +13,14 @@ import { sendRequestEmail } from "../utils/emailService.js";
 import { checkRideCooldown, checkRequestLimit, setCooldown } from "../middleware/rideCooldown.js";
 import { searchLimiter, locationsLimiter, rideLimiter } from "../middleware/rateLimiter.js";
 import { markRideAsCompleted, unmarkRideAsCompleted } from "../utils/rideStatusManager.js";
+import {
+  notifyRideDeletion,
+  notifyJoinApproved,
+  notifyJoinRejected,
+  notifyPassengerRemoved,
+  notifyPassengerLeft,
+  isWithinNotificationWindow,
+} from "../utils/notificationService.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UNIVERSITIES_PATH = path.join(__dirname, "../data/us_universities.json");
@@ -314,7 +322,7 @@ router.post("/", authenticateToken, rideLimiter, (req, res) => {
 // });
 
 // Leave ride (for passengers)
-router.post("/:id/leave", authenticateToken, rideLimiter, (req, res) => {
+router.post("/:id/leave", authenticateToken, rideLimiter, async (req, res) => {
   try {
     const { id } = req.params;
     const email = req.user?.email;
@@ -324,6 +332,11 @@ router.post("/:id/leave", authenticateToken, rideLimiter, (req, res) => {
       userEmail: email,
       action: "leave"
     });
+
+    const ride = db.findRideById(id);
+    if (!ride) {
+      return res.status(404).json({ error: "Ride not found" });
+    }
 
     const result = db.leaveRide(id, email);
 
@@ -337,6 +350,9 @@ router.post("/:id/leave", authenticateToken, rideLimiter, (req, res) => {
       remainingPassengers: result.passengers.length
     });
 
+    // Send notification to driver that passenger left
+    await notifyPassengerLeft(ride.driverEmail, ride, email);
+
     res.json(result);
   } catch (err) {
     console.error("Error leaving ride:", err);
@@ -345,7 +361,7 @@ router.post("/:id/leave", authenticateToken, rideLimiter, (req, res) => {
 });
 
 // Remove passenger (for drivers)
-router.post("/:id/remove/:email", authenticateToken, rideLimiter, (req, res) => {
+router.post("/:id/remove/:email", authenticateToken, rideLimiter, async (req, res) => {
   try {
     const { id, email: passengerEmail } = req.params;
     const driverEmail = req.user?.email;
@@ -377,6 +393,9 @@ router.post("/:id/remove/:email", authenticateToken, rideLimiter, (req, res) => 
       passengerEmail,
       remainingPassengers: result.passengers.length
     });
+
+    // Send removal notification
+    await notifyPassengerRemoved(passengerEmail, ride, driverEmail);
 
     res.json(result);
   } catch (err) {
@@ -435,7 +454,7 @@ router.post("/:id/request",
   });
 
 // Approve join request
-router.post("/:id/approve/:email", authenticateToken, rideLimiter, (req, res) => {
+router.post("/:id/approve/:email", authenticateToken, rideLimiter, async (req, res) => {
   try {
     const { id, email } = req.params;
     const driverEmail = req.user?.email;
@@ -457,6 +476,9 @@ router.post("/:id/approve/:email", authenticateToken, rideLimiter, (req, res) =>
       return res.status(400).json({ message: result.error });
     }
 
+    // Send approval notification
+    await notifyJoinApproved(email, result);
+
     res.json(result);
   } catch (err) {
     console.error("Error approving join request:", err);
@@ -465,7 +487,7 @@ router.post("/:id/approve/:email", authenticateToken, rideLimiter, (req, res) =>
 });
 
 // Reject join request
-router.post("/:id/reject/:email", authenticateToken, rideLimiter, (req, res) => {
+router.post("/:id/reject/:email", authenticateToken, rideLimiter, async (req, res) => {
   try {
     const { id, email } = req.params;
     const driverEmail = req.user?.email;
@@ -486,6 +508,9 @@ router.post("/:id/reject/:email", authenticateToken, rideLimiter, (req, res) => 
     if (result.error) {
       return res.status(400).json({ message: result.error });
     }
+
+    // Send rejection notification
+    await notifyJoinRejected(email, ride);
 
     res.json(result);
   } catch (err) {
@@ -615,6 +640,11 @@ router.post("/:id/unmark-complete", authenticateToken, rideLimiter, (req, res) =
 // Delete ride
 router.delete("/:id", authenticateToken, rideLimiter, async (req, res) => {
   try {
+
+    logDebug("DELETE /rides/:id - Delete ride request", {
+      rideId: req.params.id,
+      driverEmail: req.user?.email
+    });
     const { id } = req.params;
     const driverEmail = req.user?.email;
 
@@ -636,14 +666,9 @@ router.delete("/:id", authenticateToken, rideLimiter, async (req, res) => {
     // Delete the ride
     db.deleteRide(id);
 
-    // Send emails to all affected users
-    for (const userEmail of affectedUsers) {
-      await sendRideDeletedEmail(
-        userEmail,
-        ride.from,
-        ride.destination,
-        ride.departureDate
-      );
+    // Send notifications only if within time window
+    if (affectedUsers.length > 0) {
+      await notifyRideDeletion(affectedUsers, ride);
     }
 
     res.json({ message: "Ride deleted successfully" });

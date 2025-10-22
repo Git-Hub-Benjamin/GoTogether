@@ -16,6 +16,9 @@ const FindRidesSection = ({
   onSearch,
   loadingRideIds,
   onCancelRequest,
+  onFiltersChange,
+  searchLoading,
+  onPerformSearch,
 }) => {
   const { user, token } = useAuth();
   const schoolName = user?.school || "";
@@ -27,6 +30,18 @@ const FindRidesSection = ({
     )?.colors || {};
 
   const filterProps = useRideFilters(schoolName, state, token, onSearch);
+
+  // Update parent with current filters whenever they change
+  useEffect(() => {
+    if (onFiltersChange) {
+      onFiltersChange({
+        from: filterProps.fromFilter,
+        to: filterProps.toFilter,
+        radius: filterProps.distance,
+        date: filterProps.selectedDate,
+      });
+    }
+  }, [filterProps.fromFilter, filterProps.toFilter, filterProps.distance, filterProps.selectedDate, onFiltersChange]);
 
   const filterRef = useRef(null);
   const [filterHeight, setFilterHeight] = useState(null);
@@ -66,6 +81,8 @@ const FindRidesSection = ({
           colors={colors}
           onCreateRide={onCreateRide}
           {...filterProps}
+          searchLoading={searchLoading}
+          handleSearch={onPerformSearch}
         />
 
         <ResultsSection

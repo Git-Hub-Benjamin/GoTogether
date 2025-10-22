@@ -1,0 +1,4 @@
+Running the mobile client:
+    - npx expo start --tunnel
+        --> add tunnel, it makes it work    
+        --> needs to be on hotspot, eduroam doesnt work, to get laptop_ip do ipconfig and get the IPv4 under Wireless LAN adapter Wi-Fi

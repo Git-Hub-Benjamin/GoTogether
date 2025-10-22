@@ -77,7 +77,7 @@ export default function CreateRideModal({ visible, onClose, onCreateSuccess }) {
 
             <TextInput
               style={styles.input}
-              placeholder="From"
+              placeholder="Froma"
               value={formData.from}
               onChangeText={(text) => setFormData(prev => ({ ...prev, from: text }))}
             />
