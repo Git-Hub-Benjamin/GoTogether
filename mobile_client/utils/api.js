@@ -5,7 +5,7 @@
 
 const ngrok_url = 'https://mindi-loral-unorthodoxly.ngrok-free.dev'
 // hotspot
-//export const API_BASE = process.env.SHARED_API_BASE || `https://mindi-loral-unorthodoxly.ngrok-free.dev/api`;
+//export const API_BASE = process.env.SHARED_API_BASE || `https://3ggvzqk-anonymous-8081.exp.direct/api`;
 // ngrok
 export const API_BASE = process.env.SHARED_API_BASE || `${ngrok_url}/api`;
 
