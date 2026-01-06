@@ -9,14 +9,19 @@ param(
 )
 
 # Parse arguments
-$ServiceNumber = 0
+$ServiceNumbers = @()
 $clr_ports = $false
 
 if ($Args.Count -gt 0) {
     if ($Args[0] -eq "--clr_ports") {
         $clr_ports = $true
-    } elseif ($Args[0] -as [int]) {
-        $ServiceNumber = [int]$Args[0]
+    } else {
+        # Collect all numeric arguments as service numbers
+        foreach ($arg in $Args) {
+            if ($arg -as [int]) {
+                $ServiceNumbers += [int]$arg
+            }
+        }
     }
 }
 
@@ -62,19 +67,23 @@ if ($clr_ports) {
     exit
 }
 
-if ($ServiceNumber -eq 0) {
+if ($ServiceNumbers.Count -eq 0) {
     Write-Host "Starting all services..." -ForegroundColor Green
     foreach ($service in $services) {
         Start-NewTerminal $service.cmd $service.title
         Start-Sleep -Milliseconds 500
     }
 } else {
-    # Run only the specified service
-    $selectedService = $services | Where-Object { $_.number -eq $ServiceNumber }
-    if ($selectedService) {
-        Write-Host "Starting service number $($ServiceNumber): $($selectedService.title)..." -ForegroundColor Green
-        Start-NewTerminal $selectedService.cmd $selectedService.title
-    } else {
-        Write-Host "Error: Service number $($ServiceNumber) not found. Valid options are 1-6." -ForegroundColor Red
+    # Run only the specified services
+    Write-Host "Starting services: $($ServiceNumbers -join ', ')..." -ForegroundColor Green
+    foreach ($serviceNum in $ServiceNumbers) {
+        $selectedService = $services | Where-Object { $_.number -eq $serviceNum }
+        if ($selectedService) {
+            Write-Host "Starting service number $($serviceNum): $($selectedService.title)..." -ForegroundColor Green
+            Start-NewTerminal $selectedService.cmd $selectedService.title
+            Start-Sleep -Milliseconds 500
+        } else {
+            Write-Host "Error: Service number $($serviceNum) not found. Valid options are 1-6." -ForegroundColor Red
+        }
     }
 }

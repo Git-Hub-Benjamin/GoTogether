@@ -4,6 +4,15 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import universityColors from "../../assets/university_colors.json";
 import { calculateEstimatedGasCost } from "../../utils/calculateGasCost.js";
 
+// Format time to 12-hour format with AM/PM
+const formatTime = (timeStr) => {
+  if (!timeStr) return "";
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  const period = hours >= 12 ? "PM" : "AM";
+  const displayHours = hours % 12 || 12;
+  return `${displayHours}:${String(minutes).padStart(2, "0")} ${period}`;
+};
+
 const RideCard = ({
   ride,
   userEmail,
@@ -52,97 +61,193 @@ const RideCard = ({
         },
       }}
     >
-      {/* Header */}
+      {/* Header - Route and Time */}
       <Box
         sx={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "flex-start",
-          mb: 1,
+          alignItems: "center",
+          mb: 2,
         }}
       >
-        <Box>
+        <Box sx={{ flex: 1 }}>
           <Typography
             sx={{
-              fontSize: "1.05rem",
-              fontWeight: 600,
+              fontSize: "1.25rem",
+              fontWeight: 700,
               color: colors.text_primary || "#1e293b",
+              lineHeight: 1.2,
             }}
           >
             {ride.from} → {ride.destination}
           </Typography>
           <Typography
             sx={{
-              fontSize: "0.85rem",
+              fontSize: "0.95rem",
               color: colors.text_secondary || "#6b7280",
-              mt: 0.2,
+              mt: 0.5,
+              fontWeight: 500,
             }}
           >
-            {ride.departureDate} · {ride.departureTime}
+            {ride.departureDate}
           </Typography>
         </Box>
 
-        {(joined || isPending) && (
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            ml: 2,
+          }}
+        >
           <Box
             sx={{
-              px: 1.5,
-              py: 0.5,
-              background: joined ? "#d1fae5" : "#fef3c7",
-              color: joined ? "#065f46" : "#92400e",
-              borderRadius: "12px",
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              whiteSpace: "nowrap",
+              fontSize: "1.8rem",
+              fontWeight: 700,
+              color: colors.primary || "#2563eb",
+              lineHeight: 1,
             }}
           >
-            {joined ? "Joined" : "Request Pending"}
+            {formatTime(ride.departureTime)}
           </Box>
-        )}
+          {(joined || isPending) && (
+            <Box
+              sx={{
+                px: 1.5,
+                py: 0.5,
+                background: joined ? "#d1fae5" : "#fef3c7",
+                color: joined ? "#065f46" : "#92400e",
+                borderRadius: "8px",
+                fontSize: "0.7rem",
+                fontWeight: 700,
+                whiteSpace: "nowrap",
+                mt: 1,
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+              }}
+            >
+              {joined ? "✓ Joined" : "⏳ Pending"}
+            </Box>
+          )}
+        </Box>
       </Box>
 
       <Divider sx={{ my: 1.5 }} />
 
-      {/* Ride Details */}
+      {/* Ride Details Grid */}
       <Box
         sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          rowGap: 0.8,
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 2,
+          mb: 2,
         }}
       >
-        <Typography
-          sx={{
-            fontSize: "0.9rem",
-            color: colors.text_secondary || "#475569",
-          }}
-        >
-          <strong>Driver:</strong> {ride.driverEmail}
-        </Typography>
-        <Typography
-          sx={{
-            fontSize: "0.9rem",
-            color: colors.text_secondary || "#475569",
-          }}
-        >
-          <strong>Seats Left:</strong> {remainingSeats}
-        </Typography>
-        <Typography
-          sx={{
-            fontSize: "0.9rem",
-            color: colors.text_secondary || "#475569",
-          }}
-        >
-          <strong>Distance:</strong> {ride.distance} mi
-        </Typography>
-        <Typography
-          sx={{
-            fontSize: "0.9rem",
-            color: colors.text_secondary || "#475569",
-          }}
-        >
-          <strong>Est. Gas:</strong> ~${calculateEstimatedGasCost(ride.distance, ride.passengers.length)}/person
-        </Typography>
+        {/* Driver */}
+        <Box>
+          <Typography
+            sx={{
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              color: colors.text_secondary || "#9ca3af",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              mb: 0.5,
+            }}
+          >
+            Driver
+          </Typography>
+          <Typography
+            sx={{
+              fontSize: "0.95rem",
+              fontWeight: 600,
+              color: colors.text_primary || "#1e293b",
+            }}
+          >
+            {ride.driverEmail.split("@")[0]}
+          </Typography>
+        </Box>
+
+        {/* Seats Left */}
+        <Box>
+          <Typography
+            sx={{
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              color: colors.text_secondary || "#9ca3af",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              mb: 0.5,
+            }}
+          >
+            Seats Available
+          </Typography>
+          <Typography
+            sx={{
+              fontSize: "0.95rem",
+              fontWeight: 600,
+              color:
+                remainingSeats === 0
+                  ? "#ef4444"
+                  : colors.primary || "#2563eb",
+            }}
+          >
+            {remainingSeats === 0 ? "Full" : `${remainingSeats} left`}
+          </Typography>
+        </Box>
+
+        {/* Gas Cost */}
+        {ride.showEstimatedGasCost && (
+          <Box>
+            <Typography
+              sx={{
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                color: colors.text_secondary || "#9ca3af",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                mb: 0.5,
+              }}
+            >
+              Est. Gas Cost
+            </Typography>
+            <Typography
+              sx={{
+                fontSize: "1rem",
+                fontWeight: 700,
+                color: colors.primary || "#2563eb",
+              }}
+            >
+              ~${calculateEstimatedGasCost(ride.distance, ride.passengers.length + 1)}/person
+            </Typography>
+          </Box>
+        )}
+
+        {/* Total Passengers */}
+        <Box>
+          <Typography
+            sx={{
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              color: colors.text_secondary || "#9ca3af",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              mb: 0.5,
+            }}
+          >
+            Passengers
+          </Typography>
+          <Typography
+            sx={{
+              fontSize: "0.95rem",
+              fontWeight: 600,
+              color: colors.text_primary || "#1e293b",
+            }}
+          >
+            {ride.passengers.length} / {ride.seatsAvailable}
+          </Typography>
+        </Box>
       </Box>
 
       {ride.notes && (

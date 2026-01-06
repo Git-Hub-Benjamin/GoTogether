@@ -8,10 +8,11 @@ import {
   ScrollView,
   TextInput,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
+import { ENDPOINTS } from '../constants/api';
 import usCities from '../assets/us_cities.json';
 import universityColors from '../assets/university_colors.json';
 
@@ -31,14 +32,15 @@ const getSchoolColors = (schoolName) => {
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   
   // Initialize schoolColors based on user
   const [schoolColors, setSchoolColors] = useState(() => 
     getSchoolColors(user?.school || '')
   );
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [phoneNotifications, setPhoneNotifications] = useState(true);
   const [nearbyRidesNotifs, setNearbyRidesNotifs] = useState(false);
-  const [rideUpdatesNotifs, setRideUpdatesNotifs] = useState(false);
   const [fromLocation, setFromLocation] = useState('');
   const [toLocation, setToLocation] = useState('');
   const [fromDropdownVisible, setFromDropdownVisible] = useState(false);
@@ -46,6 +48,8 @@ export default function SettingsScreen() {
   const [fromOptions, setFromOptions] = useState([]);
   const [toOptions, setToOptions] = useState([]);
   const [saveMessage, setSaveMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const scrollViewRef = useRef(null);
   const fromInputRef = useRef(null);
   const toInputRef = useRef(null);
@@ -57,21 +61,68 @@ export default function SettingsScreen() {
 
   // Load settings on mount
   useEffect(() => {
-    loadSettings();
-  }, []);
+    const loadSettingsFromServer = async () => {
+      if (!token) return;
+      
+      try {
+        setLoading(true);
+        const res = await fetch(`${ENDPOINTS.AUTH}/settings`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!res.ok) throw new Error('Failed to fetch settings');
+
+        const data = await res.json();
+        const notifSettings = data.settings.notificationSettings || {};
+        
+        setEmailNotifications(notifSettings.emailNotifications !== undefined ? notifSettings.emailNotifications : true);
+        setPhoneNotifications(notifSettings.phoneNotifications !== undefined ? notifSettings.phoneNotifications : true);
+        setNearbyRidesNotifs(notifSettings.nearbyRides !== undefined ? notifSettings.nearbyRides : false);
+        setFromLocation('');
+        setToLocation('');
+      } catch (error) {
+        console.error('Error loading settings:', error);
+        setSaveMessage('✗ Error loading settings');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSettingsFromServer();
+  }, [token]);
 
   const loadSettings = async () => {
+    if (!token) return;
+    
     try {
-      const settings = await AsyncStorage.getItem('notificationSettings');
-      if (settings) {
-        const parsed = JSON.parse(settings);
-        setNearbyRidesNotifs(parsed.nearbyRidesNotifs || false);
-        setRideUpdatesNotifs(parsed.rideUpdatesNotifs || false);
-        setFromLocation(parsed.fromLocation || '');
-        setToLocation(parsed.toLocation || '');
-      }
+      setLoading(true);
+      const res = await fetch(`${ENDPOINTS.AUTH}/settings`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!res.ok) throw new Error('Failed to fetch settings');
+
+      const data = await res.json();
+      const notifSettings = data.settings.notificationSettings || {};
+      
+      setEmailNotifications(notifSettings.emailNotifications !== undefined ? notifSettings.emailNotifications : true);
+      setPhoneNotifications(notifSettings.phoneNotifications !== undefined ? notifSettings.phoneNotifications : true);
+      setNearbyRidesNotifs(notifSettings.nearbyRides !== undefined ? notifSettings.nearbyRides : false);
+      setFromLocation('');
+      setToLocation('');
     } catch (error) {
       console.error('Error loading settings:', error);
+      setSaveMessage('✗ Error loading settings');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -114,19 +165,40 @@ export default function SettingsScreen() {
   };
 
   const saveSettings = async () => {
+    if (!token) return;
+
     try {
-      const settings = {
-        nearbyRidesNotifs,
-        rideUpdatesNotifs,
-        fromLocation,
-        toLocation,
-      };
-      await AsyncStorage.setItem('notificationSettings', JSON.stringify(settings));
+      setSaving(true);
+      setSaveMessage('');
+      
+      const res = await fetch(`${ENDPOINTS.AUTH}/notification-settings`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          emailNotifications,
+          phoneNotifications,
+          nearbyRides: nearbyRidesNotifs,
+        })
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to save settings');
+      }
+
+      // Refresh settings from server to ensure consistency
+      await loadSettings();
       setSaveMessage('✓ Settings saved');
       setTimeout(() => setSaveMessage(''), 2000);
     } catch (error) {
       console.error('Error saving settings:', error);
-      setSaveMessage('✗ Error saving settings');
+      setSaveMessage(`✗ ${error.message}`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -152,6 +224,13 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.contentContainer}
         keyboardShouldPersistTaps="handled"
       >
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={schoolColors.bg_primary} />
+            <Text style={styles.loadingText}>Loading settings...</Text>
+          </View>
+        ) : (
+          <>
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Account</Text>
           
@@ -176,15 +255,28 @@ export default function SettingsScreen() {
           
           <View style={styles.notificationItem}>
             <View style={styles.notificationToggleContainer}>
-              <Text style={styles.notificationLabel}>Ride Updates</Text>
+              <Text style={styles.notificationLabel}>Email Notifications</Text>
               <Switch
-                value={rideUpdatesNotifs}
-                onValueChange={setRideUpdatesNotifs}
+                value={emailNotifications}
+                onValueChange={setEmailNotifications}
                 trackColor={{ false: '#767577', true: '#81c784' }}
               />
             </View>
-            <Text style={styles.notificationDescription}>Notify me about updates to my rides</Text>
+            <Text style={styles.notificationDescription}>Receive email updates about your rides</Text>
           </View>
+
+          <View style={styles.notificationItem}>
+            <View style={styles.notificationToggleContainer}>
+              <Text style={styles.notificationLabel}>Phone Notifications</Text>
+              <Switch
+                value={phoneNotifications}
+                onValueChange={setPhoneNotifications}
+                trackColor={{ false: '#767577', true: '#81c784' }}
+              />
+            </View>
+            <Text style={styles.notificationDescription}>Get push notifications about ride updates</Text>
+          </View>
+
           <View style={styles.notificationItem}>
             <View style={styles.notificationToggleContainer}>
               <Text style={styles.notificationLabel}>Nearby Rides</Text>
@@ -263,11 +355,13 @@ export default function SettingsScreen() {
           style={[
             styles.saveButton,
             nearbyRidesNotifs && styles.saveButtonCompact,
-            { backgroundColor: schoolColors.button_primary_bg }
+            { backgroundColor: schoolColors.button_primary_bg },
+            saving && styles.saveButtonDisabled
           ]}
           onPress={saveSettings}
+          disabled={saving}
         >
-          <Text style={styles.saveButtonText}>Save Settings</Text>
+          <Text style={styles.saveButtonText}>{saving ? 'Saving...' : 'Save Settings'}</Text>
         </TouchableOpacity>
 
         {saveMessage ? (
@@ -277,6 +371,8 @@ export default function SettingsScreen() {
         <View style={styles.appInfoSection}>
           <Text style={styles.appInfoVersion}>Version 1.0.0</Text>
         </View>
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -417,6 +513,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
   saveMessage: {
     textAlign: 'center',
     fontSize: 14,
@@ -435,6 +534,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9ca3af',
     fontWeight: '400',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 80,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
   },
 });
 

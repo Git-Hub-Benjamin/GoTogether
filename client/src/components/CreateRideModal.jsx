@@ -8,6 +8,8 @@ import {
   Box,
   IconButton,
   Autocomplete,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -16,7 +18,7 @@ import { ENDPOINTS } from "../utils/api.js";
 
 const API_URL = ENDPOINTS.RIDES;
 
-const CreateRideModal = ({ open, onClose, onRideCreated, school, state }) => {
+const CreateRideModal = ({ open, onClose, onRideCreated, school, state, colors = {} }) => {
   const { token } = useAuth();
   const [from, setFrom] = useState("");
   const [destination, setDestination] = useState("");
@@ -24,8 +26,21 @@ const CreateRideModal = ({ open, onClose, onRideCreated, school, state }) => {
   const [departureTime, setDepartureTime] = useState("");
   const [seatsAvailable, setSeatsAvailable] = useState("");
   const [notes, setNotes] = useState("");
+  const [showEstimatedGasCost, setShowEstimatedGasCost] = useState(false);
 
   const campusOption = `${school} (Campus)`;
+
+  // Check if all required fields are filled
+  const isFormComplete = useMemo(() => {
+    return (
+      from.trim() !== "" &&
+      destination.trim() !== "" &&
+      departureDate !== "" &&
+      departureTime !== "" &&
+      seatsAvailable !== "" &&
+      seatsAvailable > 0
+    );
+  }, [from, destination, departureDate, departureTime, seatsAvailable]);
 
   // Precompute lists
   const cityList = useMemo(
@@ -115,6 +130,7 @@ const CreateRideModal = ({ open, onClose, onRideCreated, school, state }) => {
           departureTime,
           seatsAvailable,
           notes,
+          showEstimatedGasCost,
         }),
       });
 
@@ -128,6 +144,7 @@ const CreateRideModal = ({ open, onClose, onRideCreated, school, state }) => {
       setDepartureTime("");
       setSeatsAvailable("");
       setNotes("");
+      setShowEstimatedGasCost(false);
     } catch (err) {
       console.error("Error creating ride:", err);
     }
@@ -192,13 +209,28 @@ const CreateRideModal = ({ open, onClose, onRideCreated, school, state }) => {
             fullWidth
           />
 
-          <TextField
-            label="Seats Available"
-            type="number"
-            value={seatsAvailable}
-            onChange={(e) => setSeatsAvailable(e.target.value)}
-            fullWidth
-          />
+          {/* Seats and Toggle Row */}
+          <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+            <TextField
+              label="Seats Available"
+              type="number"
+              value={seatsAvailable}
+              onChange={(e) => setSeatsAvailable(e.target.value)}
+              sx={{ flex: "0 0 50%" }}
+            />
+
+            {/* Show Estimated Gas Cost Toggle */}
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={showEstimatedGasCost}
+                  onChange={(e) => setShowEstimatedGasCost(e.target.checked)}
+                />
+              }
+              label="Show Estimated Gas Cost to Passengers"
+              sx={{ flex: 1, ml: 0 }}
+            />
+          </Box>
 
           <TextField
             label="Notes (optional)"
@@ -211,10 +243,24 @@ const CreateRideModal = ({ open, onClose, onRideCreated, school, state }) => {
 
           <Button
             variant="contained"
-            color="success"
             onClick={handleSubmit}
+            disabled={!isFormComplete}
             fullWidth
-            sx={{ textTransform: "none" }}
+            sx={{
+              background: colors.button_primary_bg || "#334155",
+              color: colors.button_primary_text || "#fff",
+              textTransform: "none",
+              fontWeight: 500,
+              py: 1,
+              "&:hover": {
+                background: isFormComplete ? (colors.button_primary_hover || "#1e293b") : (colors.button_primary_bg || "#334155"),
+              },
+              "&:disabled": {
+                background: colors.button_primary_bg || "#334155",
+                opacity: 0.5,
+                color: colors.button_primary_text || "#fff",
+              }
+            }}
           >
             Create Ride
           </Button>

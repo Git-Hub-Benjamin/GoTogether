@@ -5,7 +5,7 @@ import ridesRouter from "./routes/rides.js";
 import schoolsRouter from "./routes/schools.js";
 import debugRouter from "./routes/debug.js";
 import { startRideStatusChecker, stopRideStatusChecker } from "./utils/rideStatusManager.js";
-import { connectNotificationDb, closeNotificationDb } from "./utils/notificationDb.js";
+import { connectUserDb, closeUserDb } from "./utils/userDb.js";
 
 const PORT = 5000;
 // import { PORT } from "./utils/emailService.js"
@@ -49,12 +49,12 @@ const server = app.listen(PORT, '0.0.0.0', async () => {
   // Start the ride status checker
   startRideStatusChecker();
 
-  // Connect to notification database
+  // Connect to user database
   try {
-    await connectNotificationDb();
+    await connectUserDb();
   } catch (error) {
-    console.error('Failed to connect to notification database:', error);
-    // Continue running even if notification DB fails
+    console.error('Failed to connect to user database:', error);
+    // Continue running even if user DB fails
   }
 });
 
@@ -62,7 +62,7 @@ const server = app.listen(PORT, '0.0.0.0', async () => {
 process.on("SIGTERM", async () => {
   console.log("SIGTERM received, shutting down gracefully");
   stopRideStatusChecker();
-  await closeNotificationDb();
+  await closeUserDb();
   server.close(() => {
     console.log("Server closed");
     process.exit(0);
@@ -72,7 +72,7 @@ process.on("SIGTERM", async () => {
 process.on("SIGINT", async () => {
   console.log("SIGINT received, shutting down gracefully");
   stopRideStatusChecker();
-  await closeNotificationDb();
+  await closeUserDb();
   server.close(() => {
     console.log("Server closed");
     process.exit(0);

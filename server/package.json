@@ -1,26 +1,31 @@
 {
   "name": "go-together-server",
   "version": "1.0.0",
+  "description": "Backend server for GoTogether ride-sharing app",
   "type": "module",
+  "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "seed": "node src/scripts/seedRides.js",
+    "debug": "node src/scripts/debugMenu.js",
+    "filter-universities": "node src/scripts/filter_us_universities.js",
+    "fix-states": "node src/scripts/fix_university_states.js",
+    "generate-colors": "python scripts/color/generate_school_colors.py -i server/src/data/us_universities.json -o server/src/data/us_universities_w_colors.json"
   },
   "dependencies": {
+    "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
-    "dotenv": "^16.0.3",
+    "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "express-rate-limit": "^6.7.0",
-    "googleapis": "^162.0.0",
-    "jsonwebtoken": "^9.0.0",
-    "mongodb": "^6.20.0",
+    "express-rate-limit": "^7.1.5",
+    "googleapis": "^131.0.0",
+    "jsonwebtoken": "^9.1.2",
+    "mongodb": "^6.11.0",
     "node-fetch": "^3.3.2",
-    "nodemailer": "^6.9.1"
+    "nodemailer": "^6.9.6"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22"
-  },
-  "imports": {
-    "#shared/*": "../shared/*"
+    "nodemon": "^3.0.2"
   }
 }

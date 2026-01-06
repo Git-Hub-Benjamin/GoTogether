@@ -21,6 +21,7 @@ import {
   notifyPassengerLeft,
   isWithinNotificationWindow,
 } from "../utils/notificationService.js";
+import { getMultipleUserDeviceTokens } from "../utils/userDb.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UNIVERSITIES_PATH = path.join(__dirname, "../data/us_universities.json");
@@ -89,7 +90,7 @@ router.get("/locations", authenticateToken, locationsLimiter, (req, res) => {
 router.post("/search", authenticateToken, searchLimiter, async (req, res) => {
   try {
     logDebug("Received /search request with body:", req.body);
-    const { school } = req.body;
+    const { school, showMyRidesOnly } = req.body;
     let from = req.body.from || null;
     let to = req.body.to || null;
     let radius = req.body.radius || null;
@@ -115,8 +116,14 @@ router.post("/search", authenticateToken, searchLimiter, async (req, res) => {
     // });
 
     rides = rides.filter((ride) => {
-      // Exclude rides created by the requesting user
-      if (ride.driverEmail === req.user?.email) return false;
+      // Filter by ownership: show my rides only or exclude my rides
+      if (showMyRidesOnly) {
+        // Show ONLY rides created by the requesting user
+        if (ride.driverEmail !== req.user?.email) return false;
+      } else {
+        // Show all rides EXCEPT those created by requesting user
+        if (ride.driverEmail === req.user?.email) return false;
+      }
       // Exclude rides marked for deletion
       if (ride.status?.status === "delete") return false;
       if (from && from !== ride.from) return false;
@@ -188,6 +195,7 @@ router.post("/", authenticateToken, rideLimiter, (req, res) => {
       departureTime,
       seatsAvailable,
       notes,
+      showEstimatedGasCost,
     } = req.body;
 
     logDebug("POST /rides - Create ride request", {
@@ -266,6 +274,7 @@ router.post("/", authenticateToken, rideLimiter, (req, res) => {
       departureTime,
       seatsAvailable,
       notes: notes || "",
+      showEstimatedGasCost: showEstimatedGasCost || false,
       distance,
       status: {
         status: "active",

@@ -2,7 +2,9 @@ import React, { useState } from "react";
 import { TextField, Button, Box, Typography, IconButton, Tooltip } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import SchoolSelect from "./SchoolSelect.jsx";
+// ===== TEMPORARY: USU IMPLEMENTATION ONLY - UNCOMMENT WHEN READY FOR MULTI-SCHOOL =====
+// import SchoolSelect from "./SchoolSelect.jsx";
+// ===== END TEMPORARY USU CODE =====
 import { useAuth } from "../context/AuthContext.jsx";
 import { ENDPOINTS } from "../utils/api.js";
 
@@ -12,21 +14,34 @@ const LoginForm = ({ disabled = false }) => {
   const { login } = useAuth();
 
   const [stage, setStage] = useState("email");
-  const [selectedState, setSelectedState] = useState("");
-  const [selectedSchool, setSelectedSchool] = useState(null);
+  
+  // ===== TEMPORARY: USU IMPLEMENTATION ONLY - REMOVE THESE LINES WHEN READY FOR MULTI-SCHOOL =====
+  const selectedState = "Utah";
+  const selectedSchool = { name: "Utah State University" };
+  // ===== END TEMPORARY USU CODE =====
+
+  // ===== ORIGINAL: Multi-school support (commented out for USU implementation) =====
+  // const [selectedState, setSelectedState] = useState("");
+  // const [selectedSchool, setSelectedSchool] = useState(null);
+  // ===== END ORIGINAL CODE =====
+
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
 
   const handleEmailSubmit = async () => {
-    if (!selectedSchool || !selectedState) {
-      setError("Please select your state and university first.");
+    // ===== TEMPORARY: USU IMPLEMENTATION ONLY - REMOVE THIS VALIDATION WHEN READY FOR MULTI-SCHOOL =====
+    // Hardcoded values check
+    if (!email) {
+      setError("Please enter your email.");
       return;
     }
+    // ===== END TEMPORARY USU CODE =====
 
     setError("");
-    setStatus("Sending email...");
+    setStatus("Verifying email...");
 
     try {
       const res = await fetch(`${API_URL}/verify-email`, {
@@ -34,19 +49,30 @@ const LoginForm = ({ disabled = false }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
+          // ===== TEMPORARY: USU IMPLEMENTATION ONLY - HARDCODED VALUES, REMOVE WHEN READY FOR MULTI-SCHOOL =====
           school: selectedSchool.name,
           state: selectedState,
+          // ===== END TEMPORARY USU CODE =====
         }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
 
-      // Update status message based on whether code is new or existing
-      setStatus(data.existing 
-        ? "Previous code is still valid. Please enter it below." 
-        : "New verification code sent!");
-      setStage("code");
+      // Set authentication method based on response
+      if (data.authMethod === "password") {
+        // Account has password - move to password entry stage
+        setStatus("");
+        setStage("password");
+      } else {
+        // Account uses verification code
+        if (data.codeExisting) {
+          setStatus("Previous code is still valid. Please enter it below.");
+        } else {
+          setStatus("Verification code sent to your email!");
+        }
+        setStage("code");
+      }
     } catch (err) {
       setError(err.message);
       setStatus("");
@@ -66,6 +92,42 @@ const LoginForm = ({ disabled = false }) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
 
+      // Check if user is new or existing
+      if (data.isNewUser && data.requiresSignup) {
+        // Redirect to signup page with user data
+        // Using window.location to pass data and reload
+        sessionStorage.setItem('signupData', JSON.stringify({
+          email: data.email,
+          school: data.school,
+          state: data.state,
+        }));
+        window.location.href = '/signup';
+        return;
+      }
+
+      // Existing user - login directly
+      login(data.token, data.user);
+    } catch (err) {
+      setError(err.message);
+      setStatus("");
+    }
+  };
+
+  const handlePasswordSubmit = async () => {
+    setError("");
+    setStatus("Logging in...");
+
+    try {
+      const res = await fetch(`${API_URL}/enter-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      // Login successful
       login(data.token, data.user);
     } catch (err) {
       setError(err.message);
@@ -77,6 +139,18 @@ const LoginForm = ({ disabled = false }) => {
     <Box>
       {stage === "email" && (
         <>
+          {/* ===== TEMPORARY: USU IMPLEMENTATION ONLY - REMOVE THESE LINES WHEN READY FOR MULTI-SCHOOL ===== */}
+          <Box sx={{ mb: 3, p: 2, backgroundColor: "#e8f5e9", borderRadius: 1, border: "2px solid #4caf50" }}>
+            <Typography variant="body2" sx={{ color: "#2e7d32", fontWeight: 600 }}>
+              Utah State University
+            </Typography>
+            <Typography variant="caption" sx={{ color: "#558b2f" }}>
+              Enter your USU .edu email
+            </Typography>
+          </Box>
+          {/* ===== END TEMPORARY USU CODE ===== */}
+
+          {/* ===== ORIGINAL: School/State selectors (commented out for USU implementation) =====
           <SchoolSelect
             selectedState={selectedState}
             setSelectedState={setSelectedState}
@@ -84,6 +158,7 @@ const LoginForm = ({ disabled = false }) => {
             setSelectedSchool={setSelectedSchool}
             disabled={disabled}
           />
+          ===== END ORIGINAL CODE ===== */}
 
           <TextField
             fullWidth
@@ -92,8 +167,8 @@ const LoginForm = ({ disabled = false }) => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             sx={{ mb: 2 }}
-            disabled={disabled || !selectedState || !selectedSchool}
-            placeholder={!selectedState ? "Select your state first" : !selectedSchool ? "Select your university first" : "Enter your .edu email"}
+            disabled={disabled}
+            placeholder="Enter your USU .edu email"
           />
 
           {error && (
@@ -170,6 +245,62 @@ const LoginForm = ({ disabled = false }) => {
             onClick={handleCodeSubmit}
           >
             Verify Code
+          </Button>
+
+          {status && (
+            <Typography
+              align="center"
+              sx={{ mt: 2, color: "text.secondary" }}
+            >
+              {status}
+            </Typography>
+          )}
+          {error && (
+            <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+              {error}
+            </Typography>
+          )}
+        </>
+      )}
+
+      {stage === "password" && (
+        <>
+          <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+            <IconButton
+              onClick={() => {
+                setStage("email");
+                setPassword("");
+                setError("");
+                setStatus("");
+              }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+            <Typography
+              variant="subtitle1"
+              noWrap
+              sx={{ ml: 1, fontSize: "0.95rem" }}
+            >
+              Enter Your Password
+            </Typography>
+          </Box>
+
+          <TextField
+            fullWidth
+            label="Password"
+            type="password"
+            variant="outlined"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+          <Button
+            fullWidth
+            variant="contained"
+            color="success"
+            onClick={handlePasswordSubmit}
+          >
+            Login
           </Button>
 
           {status && (

@@ -1,11 +1,10 @@
-
 // when using hotspot
 // const laptop_ip = '172.20.10.2'; //'10.9.51.119';
 //const PORT = 5000;
 
 const ngrok_url = 'https://mindi-loral-unorthodoxly.ngrok-free.dev'
 // hotspot
-//export const API_BASE = process.env.SHARED_API_BASE || `https://3ggvzqk-anonymous-8081.exp.direct/api`;
+//export const API_BASE = process.env.SHARED_API_BASE || `https://mindi-loral-unorthodoxly.ngrok-free.dev/api`;
 // ngrok
 export const API_BASE = process.env.SHARED_API_BASE || `${ngrok_url}/api`;
 

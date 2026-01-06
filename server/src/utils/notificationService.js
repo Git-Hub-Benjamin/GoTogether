@@ -1,4 +1,4 @@
-import { getDeviceTokens } from './notificationDb.js';
+import { getDeviceTokens } from './userDb.js';
 import { sendEmail } from './emailService.js';
 
 /**
@@ -54,17 +54,20 @@ export async function sendNotifications(emails, subject, htmlContent, pushData) 
       console.error(`Error sending email to ${email}:`, error);
     }
   }
-
-  // Send push notifications to users with device tokens
-  const deviceTokens = await getDeviceTokens(validEmails);
-  for (const token of deviceTokens) {
+  
+  // Send push notifications
+  const usersWithTokens = await getDeviceTokens(validEmails);
+  for (const user of usersWithTokens) {
     try {
-      // TODO: Integrate with Firebase Cloud Messaging or similar
-      // For now, just log that we would send
-      console.log(`📱 Push notification queued for ${token.email} on ${token.platform}`);
-      // await sendPushNotification(token.deviceToken, token.platform, pushData);
+      if (user.deviceTokens && Array.isArray(user.deviceTokens)) {
+        for (const deviceTokenObj of user.deviceTokens) {
+          console.log(`📱 Push notification queued for ${user.email} on ${deviceTokenObj.platform}`);
+          // TODO: Integrate with Firebase Cloud Messaging
+          // await sendPushNotification(deviceTokenObj.token, deviceTokenObj.platform, pushData);
+        }
+      }
     } catch (error) {
-      console.error(`Error sending push notification to ${token.email}:`, error);
+      console.error(`Error sending push notification to ${user.email}:`, error);
     }
   }
 }

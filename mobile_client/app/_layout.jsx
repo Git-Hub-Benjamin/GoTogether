@@ -21,6 +21,14 @@ export default function RootLayout() {
               }}
             />
             <Stack.Screen 
+              name="signup" 
+              options={{
+                headerShown: false,
+                title: 'Signup',
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen 
               name="dashboard" 
               options={{
                 headerShown: false,

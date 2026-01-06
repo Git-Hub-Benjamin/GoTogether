@@ -4,7 +4,7 @@ import universityColors from "../../assets/university_colors.json";
 import FilterSection from "./FilterSection";
 import ResultsSection from "./ResultsSection";
 import { useRideFilters } from "../../hooks/useRideFilters";
-import { useRef, useState, useEffect } from "react";
+import { useEffect } from "react";
 
 const FindRidesSection = ({
   active,
@@ -43,15 +43,6 @@ const FindRidesSection = ({
     }
   }, [filterProps.fromFilter, filterProps.toFilter, filterProps.distance, filterProps.selectedDate, onFiltersChange]);
 
-  const filterRef = useRef(null);
-  const [filterHeight, setFilterHeight] = useState(null);
-
-  useEffect(() => {
-    if (filterRef.current) {
-      setFilterHeight(`${filterRef.current.offsetHeight}px`);
-    }
-  }, [active]);
-
   return (
     <Box
       sx={{
@@ -77,7 +68,6 @@ const FindRidesSection = ({
         }}
       >
         <FilterSection
-          ref={filterRef}
           colors={colors}
           onCreateRide={onCreateRide}
           {...filterProps}
@@ -91,7 +81,6 @@ const FindRidesSection = ({
           userEmail={userEmail}
           joinRide={joinRide}
           leaveRide={leaveRide}
-          filterHeight={filterHeight}
           loadingRideIds={loadingRideIds}
           onCancelRequest={onCancelRequest}
         />

@@ -5,6 +5,8 @@ import {
   Typography,
   Autocomplete,
   CircularProgress,
+  FormControlLabel,
+  Checkbox,
 } from "@mui/material";
 import { forwardRef } from "react";
 
@@ -28,6 +30,8 @@ const FilterSection = forwardRef(
       handleSearch,
       onCreateRide,
       searchLoading,
+      showMyRidesOnly,
+      setShowMyRidesOnly,
     },
     ref
   ) => {
@@ -36,7 +40,7 @@ const FilterSection = forwardRef(
         ref={ref}
         sx={{
           width: "100%",
-          maxWidth: { xs: "90%", sm: "85%", md: "340px" },
+          maxWidth: { xs: "90%", sm: "85%", md: "360px" },
           background: colors.card_bg || "#fff",
           borderRadius: "12px",
           boxShadow: `0 4px 16px ${colors.card_shadow || "rgba(0,0,0,0.08)"}`,
@@ -44,7 +48,8 @@ const FilterSection = forwardRef(
           display: "flex",
           flexDirection: "column",
           gap: 1.8,
-          height: "fit-content",
+          // height: "fit-content",
+          height: "500px",
           position: "sticky",
           top: 20,
         }}
@@ -132,32 +137,65 @@ const FilterSection = forwardRef(
           />
         </Box>
 
-        {/* Date Field */}
-        <Box>
-          <Typography
-            sx={{
-              fontWeight: 600,
-              color: colors.text_secondary || "#334155",
-              fontSize: "13px",
-              mb: "6px",
-            }}
-          >
-            Day
-          </Typography>
-          <TextField
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            size="small"
-            fullWidth
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                borderRadius: "8px",
-                fontSize: "14px",
-              },
-            }}
-          />
+        {/* Date Field and Show My Rides Checkbox Row */}
+        <Box sx={{ display: "flex", gap: 1.5, alignItems: "flex-start" }}>
+          {/* Date Field - 50% width */}
+          <Box sx={{ flex: "0 0 50%" }}>
+            <Typography
+              sx={{
+                fontWeight: 600,
+                color: colors.text_secondary || "#334155",
+                fontSize: "13px",
+                mb: "6px",
+              }}
+            >
+              Day
+            </Typography>
+            <TextField
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              size="small"
+              fullWidth
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                },
+              }}
+            />
+          </Box>
+
+          {/* Show My Rides Checkbox - 50% width */}
+          <Box sx={{ flex: "0 0 50%", display: "flex", alignItems: "center", pt: 0.5, mt: '18px', ml: '25px' }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={showMyRidesOnly}
+                  onChange={(e) => setShowMyRidesOnly(e.target.checked)}
+                  size="small"
+                  sx={{
+                    color: colors.text_secondary || "#334155",
+                    "&.Mui-checked": {
+                      color: colors.button_primary_bg || "#1e293b",
+                    },
+                    transform: { xs: "scale(1.3)", md: "scale(1)" },
+                    transformOrigin: "left",
+                  }}
+                />
+              }
+              label="My rides"
+              sx={{
+                m: 0,
+                "& .MuiTypography-root": {
+                  fontSize: { xs: "15px", md: "13px" },
+                  fontWeight: 500,
+                  color: colors.text_secondary || "#334155",
+                },
+              }}
+            />
+          </Box>
         </Box>
 
         {/* Radius */}
@@ -273,6 +311,7 @@ const FilterSection = forwardRef(
             py: 1,
             fontSize: "13px",
             fontWeight: 500,
+            height: "100%",
             "&:hover": {
               background: colors.button_primary_hover || "#1e293b",
             },

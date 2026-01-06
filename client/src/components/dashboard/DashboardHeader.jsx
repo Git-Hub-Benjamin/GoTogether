@@ -1,13 +1,18 @@
-import { Box, Button, Typography } from "@mui/material";
+import { Box, Button, Typography, Tooltip, IconButton } from "@mui/material";
 import { useAuth } from "../../context/AuthContext.jsx";
 import universityColors from "../../assets/university_colors.json";
+import SettingsIcon from "@mui/icons-material/Settings";
+import HomeIcon from "@mui/icons-material/Home";
 
 const DashboardHeader = ({
   schoolName,
   userEmail,
+  userName,
   showMyRides,
   onToggleMyRides,
   onLogout,
+  onSettings,
+  showSettingsSection,
 }) => {
   const { user } = useAuth();
 
@@ -55,7 +60,7 @@ const DashboardHeader = ({
           GoTogether <span style={{ opacity: 0.8 }}>– {schoolName}</span>
         </Typography>
 
-        {userEmail && (
+        {(userName || userEmail) && (
           <Typography
             sx={{
               fontSize: "13px",
@@ -63,12 +68,35 @@ const DashboardHeader = ({
               color: colors.header_text || "#fff",
             }}
           >
-            Logged in as {userEmail}
+            {userName && <span>{userName}</span>}
+            {userName && userEmail && <span> • </span>}
+            {userEmail && <span>{userEmail}</span>}
           </Typography>
         )}
       </Box>
 
-      <Box sx={{ display: "flex", gap: "10px" }}>
+      <Box sx={{ display: "flex", gap: "10px", alignItems: "center" }}>
+        <Tooltip title={showSettingsSection ? "Back to Dashboard" : "Account Settings"}>
+          <IconButton
+            onClick={onSettings}
+            sx={{
+              color: colors.header_text || "#fff",
+              borderRadius: "8px",
+              transition: "all 0.2s ease",
+              "&:hover": {
+                background:
+                  colors.header_button_hover_bg || "rgba(255,255,255,0.15)",
+              },
+            }}
+          >
+            {showSettingsSection ? (
+              <HomeIcon sx={{ fontSize: "20px" }} />
+            ) : (
+              <SettingsIcon sx={{ fontSize: "20px" }} />
+            )}
+          </IconButton>
+        </Tooltip>
+
         <Button
           onClick={onToggleMyRides}
           variant="outlined"
@@ -89,7 +117,7 @@ const DashboardHeader = ({
             },
           }}
         >
-          {showMyRides ? "Back to Search" : "My Rides"}
+          {showSettingsSection ? "My Rides" : (showMyRides ? "Back to Search" : "My Rides")}
         </Button>
 
         <Button

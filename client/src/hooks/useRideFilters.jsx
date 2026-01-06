@@ -9,6 +9,7 @@ export const useRideFilters = (schoolName, state, token, onSearch) => {
   const [toFilter, setToFilter] = useState("");
   const [distance, setDistance] = useState(100);
   const [selectedDate, setSelectedDate] = useState("");
+  const [showMyRidesOnly, setShowMyRidesOnly] = useState(false);
 
   const cityList = useMemo(
     () => usCities.map((c) => `${c.city}, ${c.state_name}`),
@@ -87,6 +88,7 @@ export const useRideFilters = (schoolName, state, token, onSearch) => {
           radius: distance,
           school: schoolName,
           date: selectedDate,
+          showMyRidesOnly,
         }),
       });
 
@@ -104,6 +106,7 @@ export const useRideFilters = (schoolName, state, token, onSearch) => {
     setToFilter("");
     setDistance(100);
     setSelectedDate("");
+    setShowMyRidesOnly(false);
   };
 
   const handleDistanceChange = (e) => {
@@ -130,5 +133,7 @@ export const useRideFilters = (schoolName, state, token, onSearch) => {
     handleSearch,
     clearFilters,
     handleDistanceChange,
+    showMyRidesOnly,
+    setShowMyRidesOnly,
   };
 };

@@ -5,6 +5,7 @@ import CreateRideModal from "../components/CreateRideModal.jsx";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import FindRidesSection from "../components/dashboard/FindRidesSection.jsx";
 import MyRidesSection from "../components/dashboard/MyRidesSection.jsx";
+import SettingsSection from "../components/dashboard/SettingsSection.jsx";
 import universityColors from "../assets/university_colors.json";
 import { ENDPOINTS } from "../utils/api.js";
 
@@ -22,7 +23,8 @@ const DashboardPage = () => {
   const [showMyRides, setShowMyRides] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false); // Loading state for search button
-  
+  const [showSettingsSection, setShowSettingsSection] = useState(false); // Show SettingsSection - toggle with setShowSettingsSection
+
   // Current filters state for refreshing search
   const [currentFilters, setCurrentFilters] = useState({
     from: "",
@@ -215,6 +217,14 @@ const DashboardPage = () => {
   };
 
   const handleTabToggle = useCallback(() => {
+    // Close settings if open and set to My Rides
+    if (showSettingsSection) {
+      setShowSettingsSection(false);
+      setShowMyRides(true); // Always go to My Rides when exiting settings
+      fetchMyRides(); // Fetch my rides data
+      return;
+    }
+    
     // Update UI immediately for fast switching
     setShowMyRides(prev => !prev);
     
@@ -241,7 +251,62 @@ const DashboardPage = () => {
         return prev;
       });
     }, 500);
-  }, [fetchMyRides]);
+  }, [fetchMyRides, showSettingsSection]);
+
+  // Settings: Update notifications
+  const handleUpdateNotifications = useCallback(async (notificationSettings) => {
+    try {
+      const response = await fetch(`${API_URL.replace('/rides', '')}/user/notifications`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(notificationSettings),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update notifications");
+      }
+
+      setAlert({
+        type: 'success',
+        message: 'Notification settings updated'
+      });
+    } catch (err) {
+      console.error("Error updating notifications:", err);
+      setAlert({
+        type: 'error',
+        message: err.message || 'Failed to update notification settings'
+      });
+      throw err;
+    }
+  }, [headers]);
+
+  // Settings: Change password
+  const handleChangePassword = useCallback(async (passwordData) => {
+    try {
+      const response = await fetch(`${API_URL.replace('/rides', '')}/auth/change-password`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(passwordData),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || "Failed to change password");
+      }
+
+      setAlert({
+        type: 'success',
+        message: 'Password changed successfully'
+      });
+    } catch (err) {
+      console.error("Error changing password:", err);
+      setAlert({
+        type: 'error',
+        message: err.message || 'Failed to change password'
+      });
+      throw err;
+    }
+  }, [headers]);
 
   // Unified search function that will be triggered by search button or programmatically
   const performSearch = useCallback(async () => {
@@ -295,9 +360,10 @@ const DashboardPage = () => {
     }
   }, [user?.school, showMyRides, performSearch]);
 
-  const handleRideCreated = () => {
-    fetchMyRides();
-    setRides([]);
+  const handleRideCreated = async () => {
+    await fetchMyRides();
+    // Re-fetch search results to keep them visible
+    await performSearch();
   };
 
   const colors = useMemo(() => {
@@ -327,14 +393,35 @@ const DashboardPage = () => {
         transition: "background 1s ease",
       }}
     >
-      <DashboardHeader
-        schoolName={user?.school || ""}
-        userEmail={user?.email}
-        showMyRides={showMyRides}
-        onToggleMyRides={handleTabToggle}
-        onLogout={logout}
-      />
+      {/* Header - always show */}
+      <Box
+        sx={{
+          width: "100%",
+        }}
+      >
+        <DashboardHeader
+          schoolName={user?.school || ""}
+          userEmail={user?.email}
+          userName={user?.name}
+          showMyRides={showMyRides}
+          showSettingsSection={showSettingsSection}
+          onToggleMyRides={handleTabToggle}
+          onLogout={logout}
+          onSettings={() => {
+            if (showSettingsSection) {
+              // Close settings and return to Find Rides
+              setShowSettingsSection(false);
+              setShowMyRides(false);
+            } else {
+              // Open settings from dashboard
+              setShowSettingsSection(true);
+            }
+          }}
+        />
+      </Box>
 
+
+      {/* Dashboard Content - only show when not in settings */}
       <Container
         maxWidth={false}
         sx={{
@@ -345,71 +432,93 @@ const DashboardPage = () => {
           maxWidth: "1900px",
         }}
       >
-        {alert && (
-          <Box
-            sx={{
-              position: 'fixed',
-              top: 20,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 1000,
-              backgroundColor: alert.type === 'warning' ? '#fef3c7' : '#fee2e2',
-              color: alert.type === 'warning' ? '#92400e' : '#dc2626',
-              padding: '12px 24px',
-              borderRadius: '8px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            <span>{alert.message}</span>
+          {alert && (
             <Box
-              component="button"
-              onClick={() => setAlert(null)}
               sx={{
-                background: 'none',
-                border: 'none',
-                padding: '4px',
-                cursor: 'pointer',
-                color: 'inherit',
-                opacity: 0.7,
-                '&:hover': { opacity: 1 }
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 9999,
+                display: 'flex',
+                justifyContent: 'center',
+                p: 2,
               }}
             >
-              ✕
+              <Box
+                sx={{
+                  backgroundColor: alert.type === 'warning' ? '#fef3c7' : '#fee2e2',
+                  color: alert.type === 'warning' ? '#92400e' : '#dc2626',
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  maxWidth: '90vw',
+                  width: 'fit-content'
+                }}
+              >
+                <span>{alert.message}</span>
+                <Box
+                  component="button"
+                  onClick={() => setAlert(null)}
+                  sx={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '4px',
+                    cursor: 'pointer',
+                    color: 'inherit',
+                    opacity: 0.7,
+                    '&:hover': { opacity: 1 }
+                  }}
+                >
+                  ✕
+                </Box>
+              </Box>
             </Box>
+          )}
+          <Box
+            sx={{
+              position: "relative",
+              width: "100%",
+            }}
+          >
+            <FindRidesSection
+              active={!showMyRides && !showSettingsSection}
+              onCreateRide={() => setModalOpen(true)}
+              rides={rides}
+              userEmail={user?.email || ""}
+              joinRide={joinRide}
+              leaveRide={leaveRide}
+              onSearch={setRides}
+              loadingRideIds={loadingRideIds}
+              onCancelRequest={cancelRequest}
+              onFiltersChange={setCurrentFilters}
+              searchLoading={searchLoading}
+              onPerformSearch={performSearch}
+            />
+
+            <MyRidesSection
+              active={showMyRides && !showSettingsSection}
+              myCreatedRides={myCreatedRides}
+              myJoinedRides={myJoinedRides}
+              myRequestedRides={myRequestedRides}
+              onCreateRide={() => setModalOpen(true)}
+              onCancelRequest={cancelRequest}
+              onDelete={deleteRide}
+              onFetchRides={fetchMyRides}
+            />
+
+            <SettingsSection
+              active={showSettingsSection}
+              onUpdateNotifications={handleUpdateNotifications}
+              onChangePassword={handleChangePassword}
+            />
           </Box>
-        )}
-        <Box sx={{ position: "relative", width: "100%" }}>
-          <FindRidesSection
-            active={!showMyRides}
-            onCreateRide={() => setModalOpen(true)}
-            rides={rides}
-            userEmail={user?.email || ""}
-            joinRide={joinRide}
-            leaveRide={leaveRide}
-            onSearch={setRides}
-            loadingRideIds={loadingRideIds}
-            onCancelRequest={cancelRequest}
-            onFiltersChange={setCurrentFilters}
-            searchLoading={searchLoading}
-            onPerformSearch={performSearch}
-          />
+        </Container>
 
-          <MyRidesSection
-            active={showMyRides}
-            myCreatedRides={myCreatedRides}
-            myJoinedRides={myJoinedRides}
-            myRequestedRides={myRequestedRides}
-            onCreateRide={() => setModalOpen(true)}
-            onCancelRequest={cancelRequest}
-            onDelete={deleteRide}
-            onFetchRides={fetchMyRides}
-          />
-        </Box>
-      </Container>
-
+      {/* Footer - only show when not in settings */}
       <Box
         component="footer"
         sx={{
@@ -431,6 +540,7 @@ const DashboardPage = () => {
         onRideCreated={handleRideCreated}
         school={user?.school || ""}
         state={user?.state || ""}
+        colors={colors}
       />
     </Box>
   );

@@ -7,7 +7,6 @@ const ResultsSection = ({
   userEmail,
   joinRide,
   leaveRide,
-  filterHeight,
   loadingRideIds,
   onCancelRequest,
 }) => {
@@ -16,13 +15,14 @@ const ResultsSection = ({
       sx={{
         flex: 1,
         width: "100%",
+        maxWidth: { xs: "100%", md: "calc(100% - 380px)" },
         background: colors.card_bg || "#fff",
         borderRadius: "12px",
         boxShadow: `0 4px 16px ${colors.card_shadow || "rgba(0,0,0,0.08)"}`,
         display: "flex",
         flexDirection: "column",
-        height: { xs: "auto", md: filterHeight || "auto" },
-        minHeight: { xs: "300px", md: "400px" },
+        // minHeight: { xs: "300px", md: "400px" },
+        height: "500px",
       }}
     >
       {/* Header */}

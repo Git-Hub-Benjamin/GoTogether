@@ -7,8 +7,6 @@ import {
   ActivityIndicator, 
   StyleSheet,
   ScrollView,
-  Modal,
-  FlatList,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -16,74 +14,36 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS } from '../utils/api.js';
-import statesData from '../assets/us_states.json';
 
 const API_URL = ENDPOINTS.AUTH;
 const SERVER_URL = ENDPOINTS.SERVER;
+
+const SCHOOL_NAME = "Utah State University";
+const SCHOOL_STATE = "Utah";
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login, requestNotificationPermissions } = useAuth();
   const [serverOnline, setServerOnline] = useState(null);
-  const [stage, setStage] = useState("email");
-  const [selectedState, setSelectedState] = useState("");
-  const [selectedSchool, setSelectedSchool] = useState("");
-  const [schools, setSchools] = useState([]);
-  const [schoolsLoading, setSchoolsLoading] = useState(false);
+  const [stage, setStage] = useState("email"); // "email", "code", "password"
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
-  const [statePickerVisible, setStatePickerVisible] = useState(false);
-  const [schoolPickerVisible, setSchoolPickerVisible] = useState(false);
 
   // DEBUG SECTION - auto-populate for testing (comment out to disable)
   useEffect(() => {
-    setSelectedState("Utah");
-    setSelectedSchool("Utah State University");
     setEmail("a@usu.edu");
   }, []);
   // END DEBUG SECTION
 
   useEffect(() => {
-    console.log("\n\n\t--- Run node updateNgrokUrl.js to refresh ngrok URL ---\n\n");
-
     checkServerStatus();
     const interval = setInterval(checkServerStatus, 10000);
     return () => clearInterval(interval);
   }, []);
-
-  // Fetch schools when state changes
-  useEffect(() => {
-    if (!selectedState) {
-      setSchools([]);
-      setSelectedSchool("");
-      return;
-    }
-
-    const fetchSchools = async () => {
-      setSchoolsLoading(true);
-      try {
-        const res = await fetch(
-          `${ENDPOINTS.SCHOOLS}/${encodeURIComponent(selectedState)}`
-        );
-        const data = await res.json();
-        if (res.ok) {
-          setSchools(data);
-        } else {
-          setSchools([]);
-        }
-      } catch (err) {
-        console.error("Error fetching schools:", err);
-        setSchools([]);
-      } finally {
-        setSchoolsLoading(false);
-      }
-    };
-
-    fetchSchools();
-  }, [selectedState]);
 
   const checkServerStatus = async () => {
     try {
@@ -96,16 +56,12 @@ export default function LoginScreen() {
   };
 
   const handleEmailSubmit = async () => {
-    if (!selectedSchool || !selectedState) {
-      setError("Please select your state and university first.");
-      return;
-    }
     if (!email) {
       setError("Please enter your email.");
       return;
     }
     setError("");
-    setStatus("Sending email...");
+    setStatus("Verifying email...");
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/verify-email`, {
@@ -113,16 +69,59 @@ export default function LoginScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
-          school: selectedSchool,
-          state: selectedState,
+          school: SCHOOL_NAME,
+          state: SCHOOL_STATE,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
-      setStatus(data.existing
-        ? "Previous code is still valid. Please enter it below."
-        : "New verification code sent!");
-      setStage("code");
+
+      // Determine next stage based on authentication method
+      if (data.authMethod === "password") {
+        // Account has password - move to password entry stage
+        setStatus("");
+        setStage("password");
+      } else {
+        // Account uses verification code
+        if (data.codeExisting) {
+          setStatus("Previous code is still valid. Please enter it below.");
+        } else {
+          setStatus("Verification code sent to your email!");
+        }
+        setStage("code");
+      }
+    } catch (err) {
+      setError(err.message);
+      setStatus("");
+    }
+    setLoading(false);
+  };
+
+  const handlePasswordSubmit = async () => {
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
+    setError("");
+    setStatus("Logging in...");
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/enter-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      // Login successful
+      await login(data.token, { 
+        email: data.user.email, 
+        school: data.user.school, 
+        state: data.user.state,
+        name: data.user.name
+      });
+      router.replace('dashboard');
     } catch (err) {
       setError(err.message);
       setStatus("");
@@ -131,12 +130,14 @@ export default function LoginScreen() {
   };
 
   const handleCodeSubmit = async () => {
+    if (!code) {
+      setError("Please enter the verification code.");
+      return;
+    }
     setError("");
     setStatus("Verifying...");
     setLoading(true);
     try {
-      // First, verify the code
-      setStatus("Verifying code...");
       const res = await fetch(`${API_URL}/check-code`, {
         method: "POST",
         headers: { 
@@ -149,49 +150,40 @@ export default function LoginScreen() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       
-      // Check if server is requesting notification permissions (new user)
-      let deviceToken = null;
-      if (data.requestNotifications) {
-        setStatus("Requesting notification permissions...");
-        deviceToken = await requestNotificationPermissions();
-        
-        // If we got a device token, send it to the server
-        if (deviceToken) {
-          setStatus("Registering device token...");
-          try {
-            const tokenRes = await fetch(`${API_URL}/check-code`, {
-              method: "POST",
-              headers: { 
-                "Content-Type": "application/json",
-                "x-client-type": "mobile",
-                "x-client-platform": Platform.OS
-              },
-              body: JSON.stringify({ 
-                email, 
-                code,
-                deviceToken 
-              }),
-            });
-            const tokenData = await tokenRes.json();
-            if (tokenRes.ok && tokenData.notificationsEnabled) {
-              console.log('Device token registered successfully');
-            }
-          } catch (tokenErr) {
-            console.warn('Failed to register device token:', tokenErr);
-            // Continue even if token registration fails
+      // Check if user is new or existing
+      if (data.isNewUser && data.requiresSignup) {
+        // Navigate to signup screen with user data
+        router.push({
+          pathname: '/signup',
+          params: {
+            email: data.email,
+            school: data.school,
+            state: data.state,
           }
-        }
+        });
+      } else {
+        // Existing user - login directly
+        await login(data.token, { 
+          email: data.user.email, 
+          school: data.user.school, 
+          state: data.user.state,
+          name: data.user.name
+        });
+        router.replace('dashboard');
       }
-      
-      setStatus("Login successful!");
-      // Save token and user info, then navigate
-      await login(data.token, { email, school: selectedSchool, state: selectedState });
-      router.replace('dashboard');
     } catch (err) {
       setError(err.message);
       setStatus("");
     }
     setLoading(false);
+  };
+
+  const handleBackPress = () => {
+    setStage("email");
+    setCode("");
+    setPassword("");
+    setError("");
+    setStatus("");
   };
 
   return (
@@ -202,19 +194,17 @@ export default function LoginScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* HEADER */}
           <View style={styles.titleRow}>
             <View style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
               <Text style={styles.title}>GoTogether</Text>
-              {/* Show bubble next to title when online */}
               {serverOnline === true && (
                 <View style={[styles.statusBubble, { backgroundColor: '#2e7d32' }]} />
               )}
             </View>
-
             <Text style={styles.version}>v1.0</Text>
           </View>
 
-          {/* When offline, show bubble below the version */}
           {serverOnline === null ? (
             <ActivityIndicator size="small" color="#2e7d32" />
           ) : serverOnline === false ? (
@@ -224,195 +214,112 @@ export default function LoginScreen() {
             </View>
           ) : null}
 
-          {stage === "email" ? (
+          {/* SCHOOL INFO BOX */}
+          <View style={styles.schoolInfoBox}>
+            <Text style={styles.schoolInfoTitle}>{SCHOOL_NAME}</Text>
+            <Text style={styles.schoolInfoSubtitle}>Enter your {SCHOOL_NAME.split(' ').pop()} email</Text>
+          </View>
+
+          {/* EMAIL STAGE */}
+          {stage === "email" && (
             <>
-              {/* STATE PICKER */}
-              <View style={styles.pickerContainer}>
-                <Text style={styles.label}>Select State</Text>
-                <TouchableOpacity 
-                  style={[
-                    styles.pickerButton,
-                    serverOnline === false && styles.pickerButtonDisabled
-                  ]}
-                  onPress={() => serverOnline !== false && setStatePickerVisible(true)}
-                  disabled={serverOnline === false}
-                >
-                  <Text style={[
-                    styles.pickerButtonText,
-                    !selectedState && styles.placeholderText,
-                    serverOnline === false && styles.disabledText
-                  ]}>
-                    {selectedState || "Choose a state..."}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-            {/* STATE PICKER MODAL */}
-            {statePickerVisible && (
-            <Modal
-              visible={true}
-              transparent
-              animationType="slide"
-              onRequestClose={() => setStatePickerVisible(false)}
-            >
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                  <View style={styles.modalHeader}>
-                    <TouchableOpacity onPress={() => setStatePickerVisible(false)}>
-                      <Text style={styles.modalHeaderButton}>Done</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <FlatList
-                    data={statesData}
-                    keyExtractor={(item) => item}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity
-                        style={[
-                          styles.pickerItem,
-                          selectedState === item && styles.pickerItemSelected
-                        ]}
-                        onPress={() => {
-                          setSelectedState(item);
-                          setSelectedSchool(""); // Reset school when state changes
-                          setStatePickerVisible(false);
-                        }}
-                      >
-                        <Text style={[
-                          styles.pickerItemText,
-                          selectedState === item && styles.pickerItemTextSelected
-                        ]}>
-                          {item}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
-              </View>
-            </Modal>
-            )}
-
-              {/* SCHOOL PICKER */}
-              <View style={styles.pickerContainer}>
-                <Text style={styles.label}>Select School</Text>
-                <TouchableOpacity 
-                  style={[
-                    styles.pickerButton,
-                    (!selectedState || serverOnline === false) && styles.pickerButtonDisabled
-                  ]}
-                  onPress={() => selectedState && serverOnline !== false && setSchoolPickerVisible(true)}
-                  disabled={!selectedState || serverOnline === false}
-                >
-                  <Text style={[
-                    styles.pickerButtonText,
-                    !selectedSchool && styles.placeholderText,
-                    (!selectedState || serverOnline === false) && styles.disabledText
-                  ]}>
-                    {schoolsLoading ? "Loading schools..." : selectedState ? (selectedSchool || "Choose a school...") : "Select state first"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* SCHOOL PICKER MODAL */}
-              {schoolPickerVisible && (
-              <Modal
-                visible={true}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setSchoolPickerVisible(false)}
-              >
-                <View style={styles.modalOverlay}>
-                  <View style={styles.modalContent}>
-                    <View style={styles.modalHeader}>
-                      <TouchableOpacity onPress={() => setSchoolPickerVisible(false)}>
-                        <Text style={styles.modalHeaderButton}>Done</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <FlatList
-                      data={schools.map(s => s.name).sort()}
-                      keyExtractor={(item) => item}
-                      renderItem={({ item }) => (
-                        <TouchableOpacity
-                          style={[
-                            styles.pickerItem,
-                            selectedSchool === item && styles.pickerItemSelected
-                          ]}
-                          onPress={() => {
-                            setSelectedSchool(item);
-                            setSchoolPickerVisible(false);
-                          }}
-                        >
-                          <Text style={[
-                            styles.pickerItemText,
-                            selectedSchool === item && styles.pickerItemTextSelected
-                          ]}>
-                            {item}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    />
-                  </View>
-                </View>
-              </Modal>
-              )}
-
-              {/* EMAIL INPUT */}
-              <View style={styles.pickerContainer}>
-                <Text style={styles.label}>School Email</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    (!(selectedState && selectedSchool) || serverOnline === false) && styles.inputDisabled
-                  ]}
-                  placeholder={selectedState && selectedSchool ? "Enter your email" : "Select state and school first"}
-                  placeholderTextColor={selectedState && selectedSchool ? "#999" : "#ccc"}
-                  value={email}
-                  onChangeText={setEmail}
-                  editable={!!(selectedState && selectedSchool && serverOnline !== false)}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                />
-              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your school email"
+                placeholderTextColor="#ccc"
+                value={email}
+                onChangeText={setEmail}
+                editable={serverOnline !== false}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
 
               <TouchableOpacity
                 style={[
                   styles.button,
-                  (!selectedState || !selectedSchool || !email || loading || serverOnline === false) && styles.buttonDisabled
+                  (!email || loading || serverOnline === false) && styles.buttonDisabled
                 ]}
                 onPress={handleEmailSubmit}
-                disabled={!selectedState || !selectedSchool || !email || loading || serverOnline === false}
+                disabled={!email || loading || serverOnline === false}
               >
                 <Text style={styles.buttonText}>
                   {loading ? "Sending..." : "Send Verification Code"}
                 </Text>
               </TouchableOpacity>
             </>
-          ) : (
+          )}
+
+          {/* CODE STAGE */}
+          {stage === "code" && (
             <>
               <TouchableOpacity 
-                onPress={() => setStage("email")}
+                onPress={handleBackPress}
                 style={styles.backButton}
               >
                 <Text style={styles.backText}>← Back</Text>
               </TouchableOpacity>
+
+              <Text style={styles.stageTitle}>Enter the 6-digit Verification Code</Text>
+
               <TextInput
                 style={styles.input}
                 placeholder="Enter verification code"
+                placeholderTextColor="#ccc"
                 value={code}
                 onChangeText={setCode}
                 keyboardType="number-pad"
               />
+
               <TouchableOpacity
                 style={[styles.button, loading && styles.buttonDisabled]}
                 onPress={handleCodeSubmit}
-                disabled={loading}
+                disabled={loading || !code}
               >
                 <Text style={styles.buttonText}>
                   {loading ? "Verifying..." : "Verify Code"}
                 </Text>
               </TouchableOpacity>
+
+              <TouchableOpacity onPress={handleEmailSubmit}>
+                <Text style={styles.resendText}>Resend Code</Text>
+              </TouchableOpacity>
             </>
           )}
 
+          {/* PASSWORD STAGE */}
+          {stage === "password" && (
+            <>
+              <TouchableOpacity 
+                onPress={handleBackPress}
+                style={styles.backButton}
+              >
+                <Text style={styles.backText}>← Back</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.stageTitle}>Enter Your Password</Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your password"
+                placeholderTextColor="#ccc"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
+
+              <TouchableOpacity
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handlePasswordSubmit}
+                disabled={loading || !password}
+              >
+                <Text style={styles.buttonText}>
+                  {loading ? "Logging in..." : "Login"}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {/* ERROR AND STATUS MESSAGES */}
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {status ? <Text style={styles.status}>{status}</Text> : null}
         </ScrollView>
@@ -434,107 +341,61 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: '100%',
   },
+  titleRow: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 8,
     color: '#2e7d32',
   },
   version: {
     fontSize: 14,
-    textAlign: 'center',
     color: '#666',
-    marginBottom: 20,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 20,
+    marginTop: 4,
   },
   statusBubble: {
     width: 12,
     height: 12,
     borderRadius: 6,
   },
+  offlineRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 20,
+  },
   statusText: {
     color: '#d32f2f',
     fontSize: 14,
     fontWeight: '500',
   },
-  pickerContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  pickerButton: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    justifyContent: 'center',
-  },
-  pickerButtonDisabled: {
-    backgroundColor: '#f0f0f0',
-    opacity: 0.6,
-  },
-  pickerButtonText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  placeholderText: {
-    color: '#999',
-  },
-  disabledText: {
-    color: '#ccc',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  modalHeaderButton: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2e7d32',
-  },
-  pickerItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  pickerItemSelected: {
+  schoolInfoBox: {
     backgroundColor: '#e8f5e9',
+    borderWidth: 2,
+    borderColor: '#4caf50',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 24,
   },
-  pickerItemText: {
+  schoolInfoTitle: {
     fontSize: 16,
-    color: '#333',
-  },
-  pickerItemTextSelected: {
-    color: '#2e7d32',
     fontWeight: '600',
+    color: '#2e7d32',
+    marginBottom: 4,
+  },
+  schoolInfoSubtitle: {
+    fontSize: 13,
+    color: '#558b2f',
+  },
+  stageTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+    textAlign: 'center',
   },
   input: {
     backgroundColor: '#fff',
@@ -545,10 +406,6 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     fontSize: 16,
     color: '#333',
-  },
-  inputDisabled: {
-    backgroundColor: '#f0f0f0',
-    color: '#999',
   },
   button: {
     backgroundColor: '#2e7d32',
@@ -570,6 +427,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
     fontSize: 14,
+    fontWeight: '500',
   },
   status: {
     color: '#2e7d32',
@@ -584,5 +442,12 @@ const styles = StyleSheet.create({
     color: '#2e7d32',
     fontSize: 16,
     fontWeight: '600',
+  },
+  resendText: {
+    color: '#2e7d32',
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 16,
   },
 });
